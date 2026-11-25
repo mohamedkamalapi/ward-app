@@ -107,6 +107,7 @@ async function boot() {
   // email-confirmation / magic link returns tokens in the hash
   if (location.hash.includes('access_token=')) {
     const p = new URLSearchParams(location.hash.slice(1));
+    if (p.get('type') === 'recovery') window.__recovery = true;
     if (p.get('access_token')) {
       saveS({ at: p.get('access_token'), rt: p.get('refresh_token'), exp: Date.now() + (+p.get('expires_in') || 3600) * 1000 - 60000 });
       history.replaceState(null, '', location.pathname);
@@ -116,6 +117,7 @@ async function boot() {
     history.replaceState(null, '', location.pathname);
   }
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
+  if (window.__recovery && S) return viewNewPassword();
   render();
 }
 
@@ -132,9 +134,9 @@ async function loadMe() {
 async function render() {
   const p = (location.hash.slice(1) || '/');
   route = p.split('?')[0];
-  if (!S) { return (route === '/register') ? viewRegister() : viewLogin(); }
+  if (!S) { return (route === '/register') ? viewRegister() : (route === '/login') ? viewLogin() : viewWelcome(); }
   if (!me) { await loadMe(); }
-  if (!S) return viewLogin();
+  if (!S) return viewWelcome();
   if (!me) return viewComplete();
   if (me.status !== 'active') return viewPending();
   try {
@@ -165,9 +167,36 @@ async function render() {
 }
 
 /* ---------- auth views ---------- */
-function authShell(inner) { return `<div class="lg"><div class="auth"><div class="logo">ورد</div><h2 class="center" style="margin:6px 0 2px">ورد المتربين</h2><p class="center muted" style="margin-top:0">منصة متابعة الورد والتربية الإيمانية</p>${inner}</div></div>`; }
+const RA_CSS = `<style>
+.ra{min-height:100vh;background:oklch(var(--background-100));display:flex;flex-direction:column;align-items:center;padding:28px 18px 40px;font-family:var(--font-body)}
+.ra .brand{width:64px;height:64px;border-radius:18px;background:oklch(var(--primary-800));color:oklch(var(--accent-300));display:flex;align-items:center;justify-content:center;font-family:var(--font-heading);font-size:26px;font-weight:700;margin-top:18px;box-shadow:0 6px 18px oklch(var(--primary-800)/.25)}
+.ra h2{font-family:var(--font-heading);font-size:21px;margin:14px 0 4px;color:oklch(var(--primary-900))}
+.ra .sub{font-size:13px;opacity:.7;margin:0 0 18px;text-align:center}
+.ra .box{width:100%;max-width:420px}
+.ra .card,.ra form.card{background:oklch(var(--background-50));border:1px solid oklch(var(--background-300));border-radius:16px;padding:18px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.ra label{display:block;font-size:12px;font-weight:600;margin:12px 0 5px;color:oklch(var(--primary-900))}
+.ra input,.ra select,.ra textarea{width:100%;box-sizing:border-box;font:inherit;font-size:15px;padding:11px 12px;border-radius:12px;border:1px solid oklch(var(--background-300));background:#fff}
+.ra input:focus,.ra select:focus,.ra textarea:focus{outline:2px solid oklch(var(--primary-400));border-color:transparent}
+.ra .btn{display:block;width:100%;box-sizing:border-box;margin-top:16px;padding:12px;border:0;border-radius:12px;font:inherit;font-weight:700;font-size:15px;background:oklch(var(--primary-700));color:#fff;text-align:center;text-decoration:none;cursor:pointer}
+.ra .btn.sec{background:transparent;color:oklch(var(--primary-800));border:1px solid oklch(var(--primary-300))}
+.ra .err{color:#b91c1c;font-size:13px;margin-top:8px;min-height:1px}
+.ra .muted{opacity:.7}.ra .small{font-size:12px}.ra .center{text-align:center}
+.ra .lnk{color:oklch(var(--primary-700));font-weight:700;text-decoration:none}
+.ra p.center{font-size:13px;margin-top:14px}
+.ra .feat{display:flex;gap:12px;align-items:center;padding:12px 14px;border:1px solid oklch(var(--background-300));border-radius:14px;background:oklch(var(--background-50));margin-bottom:10px;font-size:14px}
+.ra .feat i{width:36px;height:36px;border-radius:10px;background:oklch(var(--primary-100));color:oklch(var(--primary-700));display:flex;align-items:center;justify-content:center;font-size:18px;flex:none}
+</style>`;
+function authShell(inner, head) { return `${RA_CSS}<div class="ra"><div class="box"><div style="display:flex;flex-direction:column;align-items:center"><div class="brand">ورد</div><h2>ورد المتربين</h2><p class="sub">${head || 'منصة متابعة الورد والتربية الإيمانية'}</p></div>${inner}</div></div>`; }
+function viewWelcome() {
+  $app.innerHTML = authShell(`<div style="margin-top:6px"><div class="feat"><i class="ri-checkbox-circle-line"></i><div><b>ورد يومي منظّم</b><div class="muted small">سجّل أورادك كل يوم في ثوانٍ</div></div></div><div class="feat"><i class="ri-notification-3-line"></i><div><b>تذكيرات على الفون</b><div class="muted small">الورد، أذكار بعد الصلاة، وصيام الاثنين والخميس والأيام البيض</div></div></div><div class="feat"><i class="ri-group-line"></i><div><b>مجموعتك ومتابعة الشيخ</b><div class="muted small">تقدّمك وترتيبك وسط إخوانك</div></div></div></div><a class="btn" href="#/login">تسجيل الدخول</a><a class="btn sec" href="#/register">إنشاء حساب جديد</a>`, 'أهلًا بك. السلام عليكم ورحمة الله');
+}
 function viewLogin() {
-  $app.innerHTML = authShell(`<form class="card" id="f"><label>البريد الإلكتروني</label><input name="email" type="email" autocomplete="username" required dir="ltr"><label>كلمة المرور</label><input name="password" type="password" autocomplete="current-password" required dir="ltr"><div class="err" id="e"></div><button class="btn block">تسجيل الدخول</button></form><p class="center">ما عندكش حساب؟ <a class="lnk" href="#/register">إنشاء حساب</a></p>`);
+  $app.innerHTML = authShell(`<form class="card" id="f"><label>البريد الإلكتروني</label><input name="email" type="email" autocomplete="username" required dir="ltr"><label>كلمة المرور</label><input name="password" type="password" autocomplete="current-password" required dir="ltr"><div class="err" id="e"></div><button class="btn block">تسجيل الدخول</button><p class="center" style="margin:12px 0 0"><a class="lnk" href="#" id="fp">نسيت كلمة المرور؟</a></p></form><p class="center">ما عندكش حساب؟ <a class="lnk" href="#/register">إنشاء حساب</a></p>`);
+  document.getElementById('fp').onclick = async ev => {
+    ev.preventDefault(); const em = (document.querySelector('[name=email]').value || '').trim(), e = document.getElementById('e');
+    if (!em) { e.textContent = 'اكتب بريدك أولًا ثم اضغط نسيت كلمة المرور'; return; }
+    try { await fetch(SB + '/auth/v1/recover?redirect_to=' + encodeURIComponent(location.origin + location.pathname), { method: 'POST', headers: { apikey: KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: em }) }); e.style.color = '#166534'; e.textContent = 'لو البريد مسجّل هتوصلك رسالة لتغيير كلمة المرور.'; } catch (x) { e.textContent = errAr(x); }
+  };
   document.getElementById('f').onsubmit = async ev => {
     ev.preventDefault(); const f = new FormData(ev.target), b = ev.target.querySelector('button'); b.disabled = true; document.getElementById('e').textContent = '';
     try {
@@ -185,7 +214,7 @@ async function viewRegister() {
 <label>النوع</label><select name="gender"><option value="male">ذكر</option><option value="female">أنثى</option></select>
 <label>الفئة</label><select name="category">${['member', 'father', 'mother', 'boy', 'girl'].map(c => `<option value="${c}">${CATEGORY[c]}</option>`).join('')}</select>
 <label>الحلقة</label><select name="group"><option value="">— اختر —</option>${groups.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('')}</select>
-<label>ملاحظة (اختياري)</label><textarea name="note" rows="2"></textarea><div class="err" id="e"></div><button class="btn block">إنشاء الحساب</button></form><p class="center">عندك حساب؟ <a class="lnk" href="#/">دخول</a></p>`);
+<label>ملاحظة (اختياري)</label><textarea name="note" rows="2"></textarea><div class="err" id="e"></div><button class="btn block">إنشاء الحساب</button></form><p class="center">عندك حساب؟ <a class="lnk" href="#/login">دخول</a></p>`);
   document.getElementById('f').onsubmit = async ev => {
     ev.preventDefault(); const f = new FormData(ev.target), b = ev.target.querySelector('button'); b.disabled = true; const e = document.getElementById('e'); e.textContent = '';
     const reg = { name: f.get('name').trim(), gender: f.get('gender'), category: f.get('category'), group: f.get('group') || null, note: f.get('note').trim() };
@@ -490,7 +519,24 @@ function sheikhTabs(a) {
   const l = [['/sheikh', 'الرئيسية'], ['/sheikh/members', 'الأعضاء'], ['/sheikh/roster', 'المجموعات'], ['/sheikh/requests', 'الطلبات'], ['/sheikh/promotions', 'الترقيات'], ['/sheikh/wird', 'الأوراد']];
   return '<div class="chips">' + l.map(([p, t]) => `<a class="chip ${a === p ? 'on' : ''}" href="#${p}" style="text-decoration:none;color:inherit">${t}</a>`).join('') + '</div>';
 }
-const sheikhPage = (a, title, body) => shell(`<div class="lg"><div class="page wide" style="padding:0"><header class="top"><div><h1>${title}</h1><small>مساحة الشيخ</small></div></header>${sheikhTabs(a)}${body}</div></div>`);
+const SP_CSS = `<style>
+.sp{font-family:var(--font-body);padding-bottom:20px}.sp *{box-sizing:border-box}
+.sp header.sh h1{font-family:var(--font-heading);font-size:18px;font-weight:700;margin:0;color:oklch(var(--primary-900))}.sp header.sh small{font-size:12px;opacity:.65}
+.sp .chips{display:flex;gap:8px;overflow-x:auto;padding:12px 0;scrollbar-width:none}.sp .chip{flex:none;padding:7px 14px;border-radius:99px;border:1px solid oklch(var(--background-300));background:oklch(var(--background-50));font-size:13px;white-space:nowrap}
+.sp .chip.on{background:oklch(var(--primary-800));color:#fff!important;border-color:transparent}
+.sp .card,.sp form.card{display:block;background:oklch(var(--background-50));border:1px solid oklch(var(--background-300));border-radius:14px;padding:14px;margin-bottom:10px}
+.sp .row{display:flex;align-items:center;gap:8px}.sp .sp,.sp .row.sp{justify-content:space-between}
+.sp .muted{opacity:.68}.sp .small{font-size:12px}.sp .center{text-align:center}.sp h3{font-size:15px;margin:14px 0 8px}
+.sp .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}.sp .stat{background:oklch(var(--background-50));border:1px solid oklch(var(--background-300));border-radius:14px;padding:14px;font-size:12px;opacity:1}
+.sp .stat b{display:block;font-size:24px;font-family:var(--font-heading);color:oklch(var(--primary-700));margin-bottom:2px}
+.sp .pill{font-size:11px;padding:2px 9px;border-radius:99px;background:oklch(var(--primary-100));color:oklch(var(--primary-800))}
+.sp .btn{display:inline-block;padding:10px 16px;border:0;border-radius:11px;background:oklch(var(--primary-700));color:#fff;font:inherit;font-weight:700;font-size:14px;cursor:pointer;text-decoration:none}
+.sp .btn.sec{background:transparent;color:oklch(var(--primary-800));border:1px solid oklch(var(--primary-300))}.sp .btn.sm{padding:8px 12px;font-size:13px}.sp .btn.block{display:block;width:100%;text-align:center}
+.sp label{display:block;font-size:12px;font-weight:600;margin:10px 0 4px}
+.sp input,.sp select,.sp textarea{width:100%;font:inherit;font-size:14px;padding:10px 11px;border-radius:11px;border:1px solid oklch(var(--background-300));background:#fff}
+.sp .err{color:#b91c1c;font-size:13px}
+</style>`;
+const sheikhPage = (a, title, body) => shell(`${SP_CSS}<div class="sp"><header class="sh"><h1>${title}</h1><small>مساحة الشيخ</small></header>${sheikhTabs(a)}${body}</div>`);
 
 async function viewSheikh() {
   const [members, reqs, acts, logs] = await Promise.all([
@@ -611,4 +657,12 @@ async function viewSheikhRoster() {
   const used = new Set(m.map(x => x.user_id).filter(Boolean)), free = accts.filter(a => !used.has(a.id));
   $app.innerHTML = sheikhPage('/sheikh/roster', 'المجموعات', `<div class="space-y-4" style="display:grid;gap:14px"><p style="font-size:12px;opacity:.7;margin:0">كل اسم هنا يُربط تلقائيًا بحسابه عند التسجيل إذا تطابق الاسم، أو اربطه يدويًا من القائمة. الشيخ غير مضاف لهذه المجموعات.</p>${rosterHtml(g, m, true, free)}</div>`);
   bindRoster(viewSheikhRoster);
+}
+
+function viewNewPassword() {
+  $app.innerHTML = authShell(`<form class="card" id="f"><h3 style="margin:0">كلمة مرور جديدة</h3><label>كلمة المرور الجديدة (٦ حروف على الأقل)</label><input name="p" type="password" minlength="6" required dir="ltr" autocomplete="new-password"><div class="err" id="e"></div><button class="btn block">حفظ</button></form>`);
+  document.getElementById('f').onsubmit = async ev => {
+    ev.preventDefault(); const e = document.getElementById('e');
+    try { await api('/auth/v1/user', { method: 'PUT', body: { password: new FormData(ev.target).get('p') } }); window.__recovery = false; toast('تم تغيير كلمة المرور'); go('/'); render(); } catch (er) { e.textContent = errAr(er); }
+  };
 }
