@@ -158,7 +158,7 @@ async function render() {
       if (route === '/sheikh/reports') return await viewReports();
       if (route === '/sheikh/requests') return await viewRequests();
       if (route === '/sheikh/promotions') return await viewPromotions();
-      if (route === '/sheikh/wird') return await viewWirdMgmt();
+      if (route === '/sheikh/wird') return me.role === 'supervisor' ? go('/sheikh') : await viewWirdMgmt();
     }
     return go('/');
   } catch (e) {
@@ -692,7 +692,7 @@ const SP_CSS = `<style>
 .sp td.ok{background:#dcfce7;color:#166534;font-weight:700}.sp td.no{background:#fee2e2;color:#991b1b;font-weight:700}.sp td.na{color:#94a3b8}
 </style>`;
 function sheikhTabs(a) {
-  const l = [['/sheikh', 'الرئيسية'], ['/sheikh/reports', 'التقارير'], ['/sheikh/members', 'الأعضاء'], ['/sheikh/roster', 'المجموعات'], ['/sheikh/requests', 'الطلبات'], ['/sheikh/promotions', 'الترقيات'], ['/sheikh/wird', 'الأوراد']];
+  const l = [['/sheikh', 'الرئيسية'], ['/sheikh/reports', 'التقارير'], ['/sheikh/members', 'الأعضاء'], ['/sheikh/roster', 'المجموعات'], ['/sheikh/requests', 'الطلبات'], ['/sheikh/promotions', 'الترقيات'], ['/sheikh/wird', 'الأوراد']].filter(x => !(x[0] === '/sheikh/wird' && me && me.role === 'supervisor'));
   return '<div class="chips">' + l.map(([p, t]) => `<a class="chip ${a === p ? 'on' : ''}" href="#${p}">${p === '/sheikh/reports' ? '<i class="ri-file-chart-line" style="margin-left:4px"></i>' : ''}${t}</a>`).join('') + '</div>';
 }
 const sheikhPage = (a, title, body, sub, extra) => shell(`${SP_CSS}<div class="sp"><header class="hd"><div><h1>${title}</h1><p>${sub || 'مساحة الشيخ'}</p></div>${extra === undefined ? '<button class="btn0" id="rfb"><i class="ri-refresh-line"></i>تحديث</button>' : extra}</header>${sheikhTabs(a)}${body}</div>`);
@@ -826,6 +826,10 @@ async function viewReports(st) {
     if (st.mode === 'member') return `<table class="rp"><thead><tr><th>اليوم</th>${list.map(a => `<th>${esc(a.title)}</th>`).join('')}</tr></thead><tbody>${dates.map(d => `<tr><td class="dy">${dn(d)}</td>${list.map(a => mark(done(st.member, a, d))).join('')}</tr>`).join('')}</tbody></table>`;
     return `<table class="rp"><thead><tr><th>العضو</th>${list.map(a => `<th>${esc(a.title)}</th>`).join('')}</tr></thead><tbody>${members.map(m => `<tr><td class="dy">${esc(m.full_name)}</td>${list.map(a => { const n = dates.filter(d => done(m.id, a, d)).length; return `<td class="${n === dates.length ? 'ok' : n === 0 ? 'no' : ''}" style="${n && n < dates.length ? 'background:#fef9c3;color:#854d0e;font-weight:700' : ''}">${n2a(n)}/${n2a(dates.length)}</td>`; }).join('')}</tr>`).join('')}</tbody></table>`;
   };
+  const pct = (uid, list) => { if (!list.length) return null; let n = 0; list.forEach(a => dates.forEach(d => { if (done(uid, a, d)) n++; })); return Math.round(100 * n / (list.length * dates.length)); };
+  const nawafil = acts.filter(a => a.category === 'worship');
+  const pc = v => v === null ? '—' : n2a(v) + '٪';
+  const pctBox = members.length ? `<section class="panel"><b style="font-size:14px">نسبة الفرائض والنوافل</b><div class="mt">الفرائض = أوراد تصنيف «الفرائض»، النوافل = أوراد تصنيف «العبادات». الحساب: الأيام المسجّلة ÷ (عدد الأوراد × الأيام).</div><div class="tw nx"><table class="rp"><thead><tr><th>العضو</th><th>الفرائض</th><th>النوافل</th></tr></thead><tbody>${members.map(m => `<tr><td class="dy">${esc(m.full_name)}</td><td>${pc(pct(m.id, main))}</td><td>${pc(pct(m.id, nawafil))}</td></tr>`).join('')}</tbody></table></div></section>` : '';
   let rank = '';
   if (!fajr) rank = `<section class="panel"><b style="font-size:14px"><i class="ri-trophy-line"></i> ترتيب صلاة الفجر</b><div class="mt">لا يوجد ورد باسم «صلاة الفجر» لتسجيله يوميًا. أضف وردًا بهذا الاسم من «الأوراد» ليظهر الترتيب هنا تلقائيًا من التسجيلات الفعلية.</div></section>`;
   if (fajr) {
@@ -835,7 +839,7 @@ async function viewReports(st) {
   const who = st.mode === 'member' ? (members.find(m => m.id === st.member) || {}).full_name || '' : 'كل أعضاء الحلقة';
   window.__rpData = { who, days: st.days, from: f, to: t, main, other, tableHtml: tableFor, rows: null };
   $app.innerHTML = sheikhPage('/sheikh/reports', 'التقارير', `<section class="panel" style="margin-top:14px"><div class="pills" style="margin:0"><button class="pl ${st.mode === 'group' ? 'on' : ''}" data-m="group"><i class="ri-group-line"></i>الحلقة كلها</button><button class="pl ${st.mode === 'member' ? 'on' : ''}" data-m="member"><i class="ri-user-line"></i>عضو واحد</button></div>${st.mode === 'member' ? `<select class="it" id="rm" style="margin-top:10px">${members.map(m => `<option value="${m.id}" ${m.id === st.member ? 'selected' : ''}>${esc(m.full_name)}</option>`).join('')}</select>` : ''}<select class="it" id="rd" style="margin-top:10px">${[7, 14, 30].map(n => `<option value="${n}" ${st.days === n ? 'selected' : ''}>آخر ${n2a(n)} يومًا</option>`).join('')}</select><div class="rw" style="margin-top:12px;gap:8px"><button class="btn1" style="flex:1" id="xpdf"><i class="ri-file-pdf-2-line"></i>تصدير PDF</button><button class="btn1 sec" style="flex:1" id="xpng"><i class="ri-image-line"></i>تصدير صورة</button></div></section>
-${members.length ? `<h3>الفرائض والعبادات الأساسية</h3><div class="tw">${tableFor(main) || '<div class="em">لا توجد أوراد في هذا التصنيف.</div>'}</div>${rank}${other.length ? `<h3>باقي الأوراد</h3><div class="tw">${tableFor(other)}</div>` : ''}<section class="panel"><b style="font-size:14px">الورد الموسمي</b><div class="mt">لا يوجد ورد موسمي مسجّل بعد. يظهر هنا تلقائيًا عند تفعيل موسم.</div></section>` : emptyBox('ri-file-chart-line', 'لا يوجد أعضاء مفعّلون', 'تظهر التقارير بعد تفعيل الأعضاء وتسجيلهم.')}`, 'جدول تلقائي بعلامات ✓ و ✗ لما سجّله كل عضو في كل ورد. البيانات من التسجيلات الفعلية فقط.');
+${members.length ? `<h3>الفرائض والعبادات الأساسية</h3><div class="tw">${tableFor(main) || '<div class="em">لا توجد أوراد في هذا التصنيف.</div>'}</div>${pctBox}${rank}${other.length ? `<h3>باقي الأوراد</h3><div class="tw">${tableFor(other)}</div>` : ''}<section class="panel"><b style="font-size:14px">الورد الموسمي</b><div class="mt">لا يوجد ورد موسمي مسجّل بعد. يظهر هنا تلقائيًا عند تفعيل موسم.</div></section>` : emptyBox('ri-file-chart-line', 'لا يوجد أعضاء مفعّلون', 'تظهر التقارير بعد تفعيل الأعضاء وتسجيلهم.')}`, 'جدول تلقائي بعلامات ✓ و ✗ لما سجّله كل عضو في كل ورد. البيانات من التسجيلات الفعلية فقط.');
   bindRefresh(() => viewReports(st));
   document.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { st.mode = b.dataset.m; viewReports(st); });
   const rm = document.getElementById('rm'); if (rm) rm.onchange = e => { st.member = e.target.value; viewReports(st); };
@@ -844,7 +848,7 @@ ${members.length ? `<h3>الفرائض والعبادات الأساسية</h3><
   document.getElementById('xpng').onclick = () => exportPng();
 }
 function reportDoc() {
-  const R = window.__rpData, el = document.querySelectorAll('.sp .tw');
+  const R = window.__rpData, el = document.querySelectorAll('.sp .tw:not(.nx)');
   const title = `تقرير الورد، ${R.who}`;
   const sub = `من ${R.from} إلى ${R.to}`;
   return { title, sub, tables: [...el].map(e => e.innerHTML), heads: ['الفرائض والعبادات الأساسية', 'باقي الأوراد'] };
@@ -856,7 +860,7 @@ function exportPdf() {
   w.document.close();
 }
 function exportPng() {
-  const d = reportDoc(), tabs = [...document.querySelectorAll('.sp .tw table.rp')];
+  const d = reportDoc(), tabs = [...document.querySelectorAll('.sp .tw:not(.nx) table.rp')];
   const FONT = '"Noto Sans Arabic","Tajawal",Tahoma,Arial,sans-serif', cw = 96, rh = 34, fw = 120, pad = 24;
   const maxc = Math.max(...tabs.map(t => t.rows[0].cells.length));
   const W = pad * 2 + fw + (maxc - 1) * cw;
