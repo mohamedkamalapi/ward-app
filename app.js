@@ -61,6 +61,46 @@ function go(p) { location.hash = '#' + p; }
 window.addEventListener('hashchange', render);
 function isStaff() { return me && (me.role === 'sheikh' || me.role === 'super_admin'); }
 
+/* ---------- reminders (web push) ---------- */
+const VAPID_PUB = 'BBZJdy5-CMO6V7L4qrQ9gmdPncigkz_2uki4aENfG8pK2qztLzZ3ztme6Y6iNhhCwPJenTHFDYIKPUgo7h42DPo';
+const u8 = b => { const p = '='.repeat((4 - b.length % 4) % 4), s = atob((b + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from([...s].map(c => c.charCodeAt(0))); };
+const RKEYS = [['wird', 'ri-book-open-line', 'تذكير ورد اليوم', 'كل يوم الساعة ٨:٣٠ مساءً'], ['prayers', 'ri-time-line', 'أذكار بعد كل صلاة', 'بعد الأذان بـ١٠ دقائق، من حصن المسلم (توقيت القاهرة)'], ['monthu', 'ri-moon-line', 'صيام الاثنين والخميس', 'تنبيه الليلة السابقة الساعة ٩ مساءً'], ['whitedays', 'ri-contrast-2-line', 'الأيام البيض', '١٣ و١٤ و١٥ من كل شهر هجري']];
+function pushState() {
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent), standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return ios && !standalone ? 'ios-install' : 'unsupported';
+  return Notification.permission;
+}
+async function viewReminders() {
+  let prefs = { wird: true, prayers: true, monthu: true, whitedays: true }; let sub = null;
+  try { const r = await q('reminder_prefs', 'select=*&user_id=eq.' + S.uid); if (r[0]) prefs = r[0]; } catch (e) { }
+  try { const reg = await navigator.serviceWorker.ready; sub = await reg.pushManager.getSubscription(); } catch (e) { }
+  const st = pushState(), on = !!sub && st === 'granted';
+  const msg = st === 'ios-install' ? 'على الآيفون: افتح الموقع في Safari، اضغط مشاركة ثم "إضافة إلى الشاشة الرئيسية"، وافتح التطبيق من الأيقونة، ثم فعّل الإشعارات.' : st === 'unsupported' ? 'هذا المتصفح لا يدعم الإشعارات.' : st === 'denied' ? 'الإشعارات محظورة لهذا الموقع. فعّلها من إعدادات المتصفح أو الهاتف.' : '';
+  const row = ([k, ic, t, s]) => `<li class="flex items-center gap-3 px-4 py-3"><span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary-50 text-primary-700"><i class="${ic} text-[14px]"></i></span><span class="min-w-0 flex-1"><span class="block text-[12.5px] font-medium text-foreground-800">${t}</span><span class="block text-[10.5px] text-foreground-500">${s}</span></span><button data-k="${k}" role="switch" aria-checked="${!!prefs[k]}" class="relative h-6 w-11 shrink-0 rounded-full transition-colors ${prefs[k] ? 'bg-primary-700' : 'bg-background-300'}"><span class="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${prefs[k] ? 'right-0.5' : 'right-[22px]'}"></span></button></li>`;
+  $app.innerHTML = shell(`<div class="space-y-4 md:space-y-5"><div><h2 class="font-heading text-2xl font-semibold text-foreground-900">الإشعارات والتذكيرات</h2><p class="mt-1 text-[12px] text-foreground-600">تصلك على هاتفك كإشعارات حقيقية.</p></div>
+  <div class="rounded-xl border border-background-300 bg-white p-4"><div class="flex items-center justify-between gap-3"><div><p class="text-[13px] font-semibold text-foreground-800">إشعارات هذا الجهاز</p><p class="text-[11px] text-foreground-500">${on ? 'مفعّلة' : 'غير مفعّلة'}</p></div><button id="pushb" class="rounded-lg ${on ? 'border border-background-300 text-foreground-700' : 'bg-primary-700 text-white'} px-4 py-2 text-[12px] font-medium">${on ? 'إيقاف' : 'تفعيل'}</button></div>${msg ? `<p class="mt-3 rounded-lg bg-accent-50 p-3 text-[11px] leading-6 text-accent-900">${msg}</p>` : ''}${on ? '<button id="pusht" class="mt-3 text-[11.5px] font-medium text-primary-700 underline">أرسل إشعار تجربة</button>' : ''}</div>
+  <ul class="divide-y divide-background-200 overflow-hidden rounded-xl border border-background-300 bg-white">${RKEYS.map(row).join('')}</ul>
+  <p class="text-[10.5px] leading-6 text-foreground-500">المواقيت من خدمة Aladhan المجانية (القاهرة، الهيئة المصرية). الوصول بأفضل جهد وقد يتأخر قليلًا، خاصة مع توفير البطارية في أندرويد.</p></div>`);
+  document.getElementById('pushb').onclick = async () => {
+    try {
+      if (on) { await sub.unsubscribe(); await api('/rest/v1/push_subs?endpoint=eq.' + encodeURIComponent(sub.endpoint), { method: 'DELETE' }); toast('تم الإيقاف'); return render(); }
+      if (Notification.permission !== 'granted' && (await Notification.requestPermission()) !== 'granted') { toast('لم يتم السماح بالإشعارات'); return render(); }
+      const reg = await navigator.serviceWorker.ready;
+      const s = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: u8(VAPID_PUB) });
+      const j = s.toJSON();
+      await api('/rest/v1/push_subs?on_conflict=endpoint', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates' }, body: { user_id: S.uid, endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth } });
+      await api('/rest/v1/reminder_prefs?on_conflict=user_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates' }, body: { user_id: S.uid, ...prefs } });
+      toast('تم التفعيل'); render();
+    } catch (e) { toast('تعذّر التفعيل: ' + e.message); }
+  };
+  const tb = document.getElementById('pusht'); if (tb) tb.onclick = async () => { const reg = await navigator.serviceWorker.ready; reg.showNotification('تجربة التذكير', { body: 'الإشعارات تعمل على هذا الجهاز.', icon: 'icon-192.png', dir: 'rtl', lang: 'ar' }); };
+  document.querySelectorAll('[data-k]').forEach(b => b.onclick = async () => {
+    prefs[b.dataset.k] = !prefs[b.dataset.k];
+    try { await api('/rest/v1/reminder_prefs?on_conflict=user_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates' }, body: { user_id: S.uid, wird: prefs.wird, prayers: prefs.prayers, monthu: prefs.monthu, whitedays: prefs.whitedays } }); } catch (e) { toast('تعذّر الحفظ'); }
+    b.setAttribute('aria-checked', prefs[b.dataset.k]); b.className = b.className.replace(/bg-primary-700|bg-background-300/, prefs[b.dataset.k] ? 'bg-primary-700' : 'bg-background-300'); const d = b.firstElementChild; d.className = d.className.replace(/right-0\.5|right-\[22px\]/, prefs[b.dataset.k] ? 'right-0.5' : 'right-[22px]');
+  });
+}
+
 function tabs() { return ''; }
 
 async function boot() {
@@ -107,6 +147,7 @@ async function render() {
     if (route.startsWith('/seasons/')) return await viewStatic('season');
     if (route === '/group') return await viewStatic('group');
     if (route === '/install') return await viewInstall();
+    if (route === '/reminders') return await viewReminders();
     if (isStaff()) {
       if (route === '/sheikh') return await viewSheikh();
       if (route === '/sheikh/members') return await viewMembers();
