@@ -891,3 +891,111 @@ function exportPng() {
   o.querySelector('#cl').onclick = () => o.remove();
   o.querySelector('#sh').onclick = async () => { try { const b = await (await fetch(url)).blob(), file = new File([b], 'report.png', { type: 'image/png' }); if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: d.title }); else toast('المشاركة غير مدعومة، استخدم حفظ الصورة'); } catch (e) { } };
 }
+
+/* ---------- reports v2 (sheet-style) ---------- */
+const HJ = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', { day: 'numeric' });
+const hjDay = d => +HJ.format(d).replace(/\D/g, '');
+const hjTitle = d => new Intl.DateTimeFormat('ar-u-ca-islamic-umalqura', { month: 'long', year: 'numeric' }).format(d).replace(/\s?هـ$/, '');
+const RPCSS = `<style>
+.rv .tw{max-height:72vh;overflow:auto;border-radius:14px;border:1px solid #d9e4d6;background:#fff}
+.rv table.rp{border-collapse:separate;border-spacing:0;width:100%;font-size:12px}
+.rv table.rp th{position:sticky;top:0;z-index:2;background:#166534;color:#fff;padding:8px 6px;font-weight:600;white-space:nowrap;border-left:1px solid #1f7a45}
+.rv table.rp thead tr:nth-child(2) th{top:33px;background:#1f7a45}
+.rv table.rp th.g{background:#0f4d27}
+.rv table.rp td{padding:6px 4px;text-align:center;border-bottom:1px solid #e8efe5;border-left:1px solid #eef3ec;min-width:44px}
+.rv table.rp tr:nth-child(even) td{background:#f8fbf6}
+.rv table.rp td:first-child,.rv table.rp th:first-child{position:sticky;right:0;z-index:3;min-width:84px;font-weight:700;background:#eef5ea;color:#14391f;border-left:2px solid #cfe0c9}
+.rv table.rp th:first-child{background:#0f4d27;color:#fff;z-index:4}
+.rv td.fr:first-child,.rv td.fr{background:#e2f3e6!important}
+.rv td.ok{color:#15803d;font-weight:800}.rv td.no{color:#dc2626;background:#fef2f2!important;font-weight:800}.rv td.na{color:#cbd5c8}
+.rv td.pk{background:#ffe4e6!important}.rv td small{display:block;font-size:10px;color:#475569;font-weight:600}
+.rv tr.sm td{background:#e7f1e3!important;font-weight:800;color:#14391f}
+</style>`;
+async function viewReports(st) {
+  st = st || window.__rp || { mode: 'member', member: '', days: 'm' }; window.__rp = st;
+  const [members, acts0] = await Promise.all([q('profiles', 'select=id,full_name&role=eq.member&status=eq.active&order=full_name'), q('wird_activities', 'select=*&is_active=eq.true&order=order_index.asc')]);
+  const acts = acts0;
+  const tdy = new Date(); tdy.setHours(12, 0, 0, 0);
+  let dates = [];
+  if (st.days === 'm') { const h = hjDay(tdy), s = new Date(tdy); s.setDate(s.getDate() - (h - 1)); let prev = 0; for (let i = 0; i < 31; i++) { const d = new Date(s); d.setDate(s.getDate() + i); const x = hjDay(d); if (x < prev) break; prev = x; dates.push(d); } }
+  else { for (let i = +st.days - 1; i >= 0; i--) { const d = new Date(tdy); d.setDate(tdy.getDate() - i); dates.push(d); } }
+  const ds = dates.map(ymd), f = ds[0], t = ds[ds.length - 1];
+  const [logs, parts] = await Promise.all([q('wird_logs', `select=member_id,activity_id,log_date,completed,counter_value&log_date=gte.${f}&log_date=lte.${t}&limit=20000`), q('wird_part_logs', `select=member_id,activity_id,log_date,part_index&completed=eq.true&log_date=gte.${f}&log_date=lte.${t}&limit=20000`)]);
+  if (!st.member && members[0]) st.member = members[0].id;
+  const todayS = ymd(tdy);
+  const due = (a, d) => { if (ymd(d) > todayS) return false; const r = a.day_rule || 'daily', w = d.getDay(); if (r === 'fri') return w === 5; if (r === 'fast') return w === 1 || w === 4 || (hjDay(d) >= 13 && hjDay(d) <= 15); return true; };
+  const val = (uid, a, ds1) => logs.find(x => x.member_id === uid && x.activity_id === a.id && x.log_date === ds1);
+  const done = (uid, a, ds1) => {
+    if (a.type === 'quran') return parts.filter(p => p.member_id === uid && p.activity_id === a.id && p.log_date === ds1).length >= (a.quran_parts || 1);
+    const l = val(uid, a, ds1); if (!l) return false;
+    if (a.type === 'counter') { const v = +l.counter_value || 0; if (a.max_val != null || a.min_val != null) return v > 0 && (a.min_val == null || v >= a.min_val) && (a.max_val == null || v <= a.max_val); return v >= (a.target_count || 1); }
+    return !!l.completed;
+  };
+  const DAYN = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+  const head = () => { let r1 = '<tr><th rowspan="2">اليوم</th>', r2 = '<tr>'; for (let i = 0; i < acts.length;) { const g = acts[i].grp || ''; if (!g) { r1 += `<th rowspan="2" class="g">${esc(acts[i].title)}</th>`; i++; continue; } let j = i; while (j < acts.length && (acts[j].grp || '') === g) j++; r1 += `<th colspan="${j - i}" class="g">${esc(g)}</th>`; for (let k = i; k < j; k++) r2 += `<th>${esc(acts[k].title)}</th>`; i = j; } return '<thead>' + r1 + '</tr>' + r2 + '</tr></thead>'; };
+  const cell = (uid, a, d) => {
+    if (!due(a, d)) return `<td class="na ${d.getDay() === 5 ? 'fr' : ''}" data-k="na"></td>`;
+    const ok = done(uid, a, ymd(d)), l = val(uid, a, ymd(d)), isN = a.type === 'counter' && l && +l.counter_value, n = isN ? +l.counter_value : '';
+    const pk = a.max_val != null && l && +l.counter_value > a.max_val;
+    return `<td class="${ok ? 'ok' : 'no'} ${pk ? 'pk' : ''} ${d.getDay() === 5 ? 'fr' : ''}" data-k="${ok ? 'ok' : 'no'}" data-n="${n}">${ok ? '✓' : '✗'}${n !== '' ? `<small>${n2a(n)}</small>` : ''}</td>`;
+  };
+  let tbl = '';
+  const stat = uid => acts.map(a => { let dn = 0, du = 0; dates.forEach(d => { if (due(a, d)) { du++; if (done(uid, a, ymd(d))) dn++; } }); return { dn, du }; });
+  if (st.mode === 'member') {
+    const S = stat(st.member), sumD = S.reduce((x, y) => x + y.dn, 0), sumU = S.reduce((x, y) => x + y.du, 0);
+    tbl = `<table class="rp">${head()}<tbody>${dates.map((d, i) => `<tr><td class="${d.getDay() === 5 ? 'fr' : ''}">${n2a(i + 1)} ${DAYN[d.getDay()]}</td>${acts.map(a => cell(st.member, a, d)).join('')}</tr>`).join('')}
+<tr class="sm"><td>الدرجة الفعلية</td>${S.map(x => `<td data-k="sm">${n2a(x.dn)}</td>`).join('')}</tr><tr class="sm"><td>الدرجة النهائية</td>${S.map(x => `<td data-k="sm">${n2a(x.du)}</td>`).join('')}</tr><tr class="sm"><td>النسبة</td>${S.map(x => `<td data-k="sm">${x.du ? n2a(Math.round(100 * x.dn / x.du)) + '٪' : '—'}</td>`).join('')}</tr><tr class="sm"><td>الإجمالي</td><td data-k="sm" colspan="${acts.length}">${sumU ? n2a(Math.round(100 * sumD / sumU)) + '٪' : '—'}</td></tr></tbody></table>`;
+  } else {
+    tbl = `<table class="rp">${head().replace('<th rowspan="2">اليوم</th>', '<th rowspan="2">العضو</th>')}<tbody>${members.map(m => { const S = stat(m.id), sd = S.reduce((x, y) => x + y.dn, 0), su = S.reduce((x, y) => x + y.du, 0); return `<tr><td>${esc(m.full_name)}</td>${S.map(x => `<td class="${x.du && x.dn === x.du ? 'ok' : x.du && !x.dn ? 'no' : ''}" data-k="${x.du && x.dn === x.du ? 'ok' : x.du && !x.dn ? 'no' : 'sm'}" data-n="${x.du ? x.dn + '/' + x.du : ''}">${x.du ? n2a(x.dn) + '/' + n2a(x.du) : ''}</td>`).join('')}</tr>`; }).join('')}</tbody></table>`;
+  }
+  const pctG = (uid, g) => { const l = acts.filter(a => a.grp === g); let dn = 0, du = 0; l.forEach(a => dates.forEach(d => { if (due(a, d)) { du++; if (done(uid, a, ymd(d))) dn++; } })); return du ? Math.round(100 * dn / du) : null; };
+  const pc = v => v === null ? '—' : n2a(v) + '٪';
+  const pctBox = members.length ? `<section class="panel"><b style="font-size:14px">نسبة الفرائض والنوافل</b><div class="mt">الفرائض = الصلوات الخمس في المسجد، النوافل = 12 ركعة والضحى والقيام. الأيام المستحقة فقط.</div><div class="tw nx" style="max-height:none"><table class="rp"><thead><tr><th>العضو</th><th>الفرائض</th><th>النوافل</th></tr></thead><tbody>${members.map(m => `<tr><td>${esc(m.full_name)}</td><td>${pc(pctG(m.id, 'الصلوات في المسجد'))}</td><td>${pc(pctG(m.id, 'النوافل'))}</td></tr>`).join('')}</tbody></table></div></section>` : '';
+  const fajr = acts.find(a => a.title === 'الفجر');
+  const rk = fajr ? members.map(m => ({ n: m.full_name, c: dates.filter(d => due(fajr, d) && done(m.id, fajr, ymd(d))).length, u: dates.filter(d => due(fajr, d)).length })).sort((a, b) => b.c - a.c) : [];
+  const rank = fajr ? `<section class="panel"><b style="font-size:14px"><i class="ri-trophy-line"></i> ترتيب صلاة الفجر</b>${rk.map((x, i) => `<div class="rw" style="padding:8px 0;border-top:1px solid oklch(var(--background-200));margin-top:${i ? 0 : 8}px"><span style="font-size:13px"><b style="display:inline-block;width:22px;color:oklch(var(--primary-700))">${n2a(i + 1)}</b>${esc(x.n)}</span><span class="bd ${x.c ? '' : 'w'}">${n2a(x.c)} / ${n2a(x.u)}</span></div>`).join('')}</section>` : '';
+  const who = st.mode === 'member' ? (members.find(m => m.id === st.member) || {}).full_name || '' : 'كل أعضاء الحلقة';
+  window.__rpData = { who, title: 'متابعة شهر ' + hjTitle(tdy) + ' هـ', from: f, to: t };
+  $app.innerHTML = sheikhPage('/sheikh/reports', 'التقارير', `${RPCSS}<div class="rv"><section class="panel" style="margin-top:14px"><div class="pills" style="margin:0"><button class="pl ${st.mode === 'member' ? 'on' : ''}" data-m="member"><i class="ri-user-line"></i>عضو واحد</button><button class="pl ${st.mode === 'group' ? 'on' : ''}" data-m="group"><i class="ri-group-line"></i>الحلقة كلها</button></div>${st.mode === 'member' ? `<select class="it" id="rm" style="margin-top:10px">${members.map(m => `<option value="${m.id}" ${m.id === st.member ? 'selected' : ''}>${esc(m.full_name)}</option>`).join('')}</select>` : ''}<select class="it" id="rd" style="margin-top:10px"><option value="m" ${st.days === 'm' ? 'selected' : ''}>الشهر الهجري الحالي (${esc(hjTitle(tdy))})</option>${[7, 14, 30].map(n => `<option value="${n}" ${st.days === n ? 'selected' : ''}>آخر ${n2a(n)} يومًا</option>`).join('')}</select><div class="rw" style="margin-top:12px;gap:8px"><button class="btn1" style="flex:1" id="xpdf"><i class="ri-file-pdf-2-line"></i>تصدير PDF</button><button class="btn1 sec" style="flex:1" id="xpng"><i class="ri-image-line"></i>تصدير صورة</button></div></section>
+${members.length ? `<div class="rp-title" style="margin:14px 2px 4px;font-weight:700;font-size:14px">${esc(window.__rpData.title)} · ${esc(who)}</div><div class="tw main">${tbl}</div>${pctBox}${rank}` : emptyBox('ri-file-chart-line', 'لا يوجد أعضاء مفعّلون', 'تظهر التقارير بعد تفعيل الأعضاء وتسجيلهم.')}</div>`, 'جدول تلقائي بعلامات ✓ و ✗ من التسجيلات الفعلية فقط. الخانة الفارغة = غير مستحقة أو لم يحن يومها.');
+  bindRefresh(() => viewReports(st));
+  document.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { st.mode = b.dataset.m; viewReports(st); });
+  const rm = document.getElementById('rm'); if (rm) rm.onchange = e => { st.member = e.target.value; viewReports(st); };
+  document.getElementById('rd').onchange = e => { st.days = e.target.value === 'm' ? 'm' : +e.target.value; viewReports(st); };
+  document.getElementById('xpdf').onclick = () => exportPdf();
+  document.getElementById('xpng').onclick = () => exportPng();
+}
+function reportDoc() { const R = window.__rpData, tb = document.querySelector('.rv .tw.main table.rp'); return { title: R.title + '، ' + R.who, sub: `من ${R.from} إلى ${R.to}`, tables: [tb.outerHTML], heads: [''] }; }
+function exportPdf() {
+  const d = reportDoc(), w = window.open('', '_blank'); if (!w) return toast('اسمح بالنوافذ المنبثقة');
+  w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${d.title}</title><style>@page{size:A4 landscape;margin:8mm}body{font-family:Tahoma,'Noto Sans Arabic',Arial,sans-serif;color:#14391f;margin:0}h1{font-size:17px;margin:0;color:#0f4d27}p{margin:3px 0 8px;color:#555;font-size:11px}table{border-collapse:collapse;width:100%;font-size:9px;table-layout:fixed}th{background:#166534;color:#fff;padding:4px 2px;border:1px solid #0f4d27;font-weight:600}th.g{background:#0f4d27}td{padding:2px;text-align:center;border:1px solid #d9e4d6;height:15px}td:first-child{background:#eef5ea;font-weight:700;width:62px}td.fr{background:#e2f3e6}td.ok{color:#15803d;font-weight:800}td.no{color:#dc2626;background:#fef2f2;font-weight:800}td.pk{background:#ffe4e6}td.na{color:#ccc}tr.sm td{background:#e7f1e3;font-weight:800}small{font-size:7px;color:#475569;display:block}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}</style></head><body><h1>مُتَرَبِّي · ${d.title}</h1><p>${d.sub}</p>${d.tables[0]}<script>setTimeout(function(){window.print()},400)<\/script></body></html>`);
+  w.document.close();
+}
+function exportPng() {
+  const d = reportDoc(), tb = document.querySelector('.rv .tw.main table.rp'), FONT = '"Noto Sans Arabic","Tajawal",Tahoma,Arial,sans-serif';
+  const grid = [], cells = []; [...tb.rows].forEach((tr, ri) => { grid[ri] = grid[ri] || []; let ci = 0; [...tr.cells].forEach(c => { while (grid[ri][ci]) ci++; const cs = c.colSpan, rs = c.rowSpan; for (let a = 0; a < rs; a++) for (let b = 0; b < cs; b++) { grid[ri + a] = grid[ri + a] || []; grid[ri + a][ci + b] = 1; } cells.push({ c, r: ri, col: ci, cs, rs }); ci += cs; }); });
+  const nc = Math.max(...cells.map(x => x.col + x.cs)), nr = grid.length, fw = 96, cw = 50, rh = 24, pad = 20, hh = 60;
+  const W = pad * 2 + fw + (nc - 1) * cw, H = hh + nr * rh + 50;
+  const cv = document.createElement('canvas'); cv.width = W * 2; cv.height = H * 2; const c = cv.getContext('2d'); c.scale(2, 2); c.direction = 'rtl'; c.textBaseline = 'middle'; c.textAlign = 'center';
+  c.fillStyle = '#fbf8ef'; c.fillRect(0, 0, W, H); c.fillStyle = '#14532d'; c.fillRect(0, 0, W, hh - 8);
+  c.fillStyle = '#fff'; c.textAlign = 'right'; c.font = `700 17px ${FONT}`; c.fillText('مُتَرَبِّي · ' + d.title, W - pad, 20); c.font = `11px ${FONT}`; c.fillStyle = '#d8f3e3'; c.fillText(d.sub, W - pad, 40); c.textAlign = 'center';
+  const rowOf = ri => ri, X = (col, cs) => { const right = W - pad - (col === 0 ? 0 : fw + (col - 1) * cw), w = (col === 0 ? fw : 0) + (col === 0 ? (cs - 1) * cw : cs * cw); return [right - w, w]; };
+  cells.forEach(({ c: el, r, col, cs, rs }) => {
+    const [x, w] = X(col, cs), y = hh + r * rh, h = rs * rh, k = el.dataset.k, isH = el.tagName === 'TH';
+    let bg = '#fff', fg = '#14391f'; if (isH) { bg = el.classList.contains('g') ? '#0f4d27' : '#166534'; fg = '#fff'; } else if (col === 0) bg = '#eef5ea'; else if (k === 'ok') bg = '#f0fdf4'; else if (k === 'no') bg = '#fef2f2'; else if (k === 'sm') bg = '#e7f1e3'; else if (el.classList.contains('fr')) bg = '#e2f3e6'; else if (r % 2) bg = '#f8fbf6';
+    if (el.classList.contains('pk')) bg = '#ffe4e6'; if (!isH && k !== 'ok' && k !== 'no' && col !== 0 && el.parentElement.classList.contains('sm')) bg = '#e7f1e3'; if (!isH && el.classList.contains('fr') && k === 'na') bg = '#e2f3e6';
+    c.fillStyle = bg; c.fillRect(x, y, w, h); c.strokeStyle = isH ? '#0f4d27' : '#d9e4d6'; c.strokeRect(x, y, w, h);
+    const cx = x + w / 2, cy = y + h / 2, n = el.dataset.n;
+    if ((k === 'ok' || k === 'no') && !(el.dataset.n || '').includes('/')) {
+      c.lineWidth = 2; c.lineCap = 'round'; c.lineJoin = 'round'; const ox = n ? -6 : 0;
+      if (k === 'ok') { c.strokeStyle = '#16a34a'; c.beginPath(); c.moveTo(cx + ox - 5, cy); c.lineTo(cx + ox - 1, cy + 4); c.lineTo(cx + ox + 5, cy - 4); c.stroke(); } else { c.strokeStyle = '#dc2626'; c.beginPath(); c.moveTo(cx + ox - 4, cy - 4); c.lineTo(cx + ox + 4, cy + 4); c.moveTo(cx + ox + 4, cy - 4); c.lineTo(cx + ox - 4, cy + 4); c.stroke(); }
+      if (n) { c.fillStyle = '#475569'; c.font = `9px ${FONT}`; c.fillText(String(el.querySelector('small') ? el.querySelector('small').textContent : n), cx + 12, cy, 22); }
+    } else { c.fillStyle = fg; c.font = `${isH || col === 0 || k === 'sm' ? '700 ' : ''}${isH ? 10.5 : 11}px ${FONT}`; c.fillText(el.textContent.trim(), cx, cy, w - 4); }
+  });
+  c.fillStyle = '#6b7a6f'; c.font = `10px ${FONT}`; c.fillText('أُنشئ تلقائيًا من تسجيلات الورد في مُتَرَبِّي · الخانة الفارغة = غير مستحقة', W / 2, H - 14);
+  const url = cv.toDataURL('image/png');
+  const o = document.createElement('div'); o.style.cssText = 'position:fixed;inset:0;z-index:99;background:rgba(0,0,0,.7);overflow:auto;padding:16px';
+  o.innerHTML = `<div style="background:#fff;border-radius:14px;padding:12px;max-width:900px;margin:0 auto"><img src="${url}" style="width:100%;border-radius:8px"><div style="display:flex;gap:8px;margin-top:10px"><a id="dl" download="تقرير-الورد.png" href="${url}" style="flex:1;text-align:center;background:#166534;color:#fff;padding:10px;border-radius:8px;text-decoration:none;font-size:13px">حفظ الصورة</a><button id="sh" style="flex:1;border:1px solid #166534;color:#166534;background:#fff;border-radius:8px;font:inherit;font-size:13px">مشاركة</button><button id="cl" style="border:1px solid #ccc;background:#fff;border-radius:8px;padding:0 14px">إغلاق</button></div></div>`;
+  document.body.appendChild(o); o.querySelector('#cl').onclick = () => o.remove();
+  o.querySelector('#sh').onclick = async () => { try { const b = await (await fetch(url)).blob(), file = new File([b], 'report.png', { type: 'image/png' }); if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: d.title }); else toast('المشاركة غير مدعومة، استخدم حفظ الصورة'); } catch (e) { } };
+}
