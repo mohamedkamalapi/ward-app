@@ -61,11 +61,7 @@ function go(p) { location.hash = '#' + p; }
 window.addEventListener('hashchange', render);
 function isStaff() { return me && (me.role === 'sheikh' || me.role === 'super_admin'); }
 
-function tabs(active) {
-  const t = [['/ward', '✅', 'وردي'], ['/', '🏠', 'الرئيسية'], ['/ward/history', '🗓️', 'المتابعة'], ['/more', '☰', 'المزيد']];
-  if (isStaff()) t.splice(3, 0, ['/sheikh', '🎓', 'الشيخ']);
-  return '<nav class="tabs">' + t.map(([p, i, l]) => `<a href="#${p}" class="${active === p ? 'on' : ''}"><b>${i}</b>${l}</a>`).join('') + '</nav>';
-}
+function tabs() { return ''; }
 
 async function boot() {
   // email-confirmation / magic link returns tokens in the hash
@@ -106,6 +102,11 @@ async function render() {
     if (route === '/ward') return await viewWard();
     if (route === '/ward/history') return await viewHistory();
     if (route === '/more') return await viewMore();
+    if (route === '/progress') return await viewStatic('progress');
+    if (route === '/seasons') return await viewStatic('seasons');
+    if (route.startsWith('/seasons/')) return await viewStatic('season');
+    if (route === '/group') return await viewStatic('group');
+    if (route === '/install') return await viewInstall();
     if (isStaff()) {
       if (route === '/sheikh') return await viewSheikh();
       if (route === '/sheikh/members') return await viewMembers();
@@ -117,12 +118,12 @@ async function render() {
     return go('/');
   } catch (e) {
     if (e.status === 401) { saveS(null); return render(); }
-    $app.innerHTML = `<div class="page"><div class="card center"><p>تعذّر تحميل الصفحة</p><p class="err">${esc(errAr(e))}</p><button class="btn" onclick="render()">إعادة المحاولة</button></div>${tabs(route)}</div>`;
+    $app.innerHTML = `<div class="lg"><div class="page"><div class="card center"><p>تعذّر تحميل الصفحة</p><p class="err">${esc(errAr(e))}</p><button class="btn" onclick="render()">إعادة المحاولة</button></div></div></div>`;
   }
 }
 
 /* ---------- auth views ---------- */
-function authShell(inner) { return `<div class="auth"><div class="logo">ورد</div><h2 class="center" style="margin:6px 0 2px">ورد المتربين</h2><p class="center muted" style="margin-top:0">منصة متابعة الورد والتربية الإيمانية</p>${inner}</div>`; }
+function authShell(inner) { return `<div class="lg"><div class="auth"><div class="logo">ورد</div><h2 class="center" style="margin:6px 0 2px">ورد المتربين</h2><p class="center muted" style="margin-top:0">منصة متابعة الورد والتربية الإيمانية</p>${inner}</div></div>`; }
 function viewLogin() {
   $app.innerHTML = authShell(`<form class="card" id="f"><label>البريد الإلكتروني</label><input name="email" type="email" autocomplete="username" required dir="ltr"><label>كلمة المرور</label><input name="password" type="password" autocomplete="current-password" required dir="ltr"><div class="err" id="e"></div><button class="btn block">تسجيل الدخول</button></form><p class="center">ما عندكش حساب؟ <a class="lnk" href="#/register">إنشاء حساب</a></p>`);
   document.getElementById('f').onsubmit = async ev => {
@@ -204,62 +205,214 @@ async function setLog(a, completed, counter) {
   return api('/rest/v1/wird_logs?on_conflict=member_id,activity_id,log_date', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' }, body: { tenant_id: TENANT, member_id: me.id, activity_id: a.id, log_date: today(), completed, counter_value: counter, recorded_at: new Date().toISOString() } });
 }
 
-/* ---------- member views ---------- */
+/* ---------- Readdy-style shell & member views ---------- */
+const NAV = [['/', 'ri-home-line', 'الرئيسية'], ['/ward', 'ri-checkbox-circle-line', 'وردي'], ['/progress', 'ri-line-chart-line', 'تقدمي'], ['/seasons', 'ri-calendar-line', 'المواسم'], ['/group', 'ri-group-line', 'مجموعتي'], ['/more', 'ri-menu-line', 'المزيد']];
+const navOn = (r, p) => p === '/' ? r === '/' : (r === p || r.startsWith(p + '/') || (p === '/more' && r.startsWith('/sheikh')) || (p === '/ward' && r === '/ward/history'));
+const fG = new Intl.DateTimeFormat('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+const fH = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', { day: 'numeric', month: 'long', year: 'numeric' });
+const fW = new Intl.DateTimeFormat('ar-EG', { weekday: 'long' });
+let lastStreak = 0, bellOpen = false;
+const NOTIFS = [['ri-trophy-line', 'bg-accent-100 text-accent-800', 'أنت مؤهل للانتقال إلى المرحلة الأولى', 'استوفيت شروط المرحلة التمهيدية، وبانتظار اعتماد الشيخ.', 'قبل ساعة', 1], ['ri-calendar-line', 'bg-primary-100 text-primary-800', 'بقي ٩ أيام على انتهاء موسم الست من شوال', 'أكملت ٤ أيام من ٦، وترتيبك الرابع في المجموعة.', 'قبل ٣ ساعات', 1], ['ri-notification-3-line', 'bg-secondary-100 text-secondary-800', 'إعلان جديد من شيخك', 'مجلس التربية الأسبوعي مساء الخميس بعد العشاء.', 'أمس', 1], ['ri-time-line', 'bg-background-200 text-foreground-700', 'تذكير بورد اليوم', 'لم تُسجّل أذكار المساء بعد. الورد بانتظارك.', 'أمس', 0]];
+function shell(inner, opts = {}) {
+  const r = route, d = new Date(), init = esc((me.full_name || 'م').trim()[0] || 'م');
+  const nl = (c) => NAV.map(([p, i, l]) => c(p, i, l, navOn(r, p)));
+  const side = nl((p, i, l, on) => `<li><a class="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors duration-smooth ${on ? 'bg-primary-50 font-medium text-primary-800' : 'text-foreground-700 hover:bg-background-100 hover:text-foreground-900'}" href="#${p}"><span class="flex h-8 w-8 items-center justify-center rounded-md ${on ? 'bg-primary-100 text-primary-700' : 'bg-background-100 text-foreground-500'}"><i class="${i} text-base"></i></span><span class="whitespace-nowrap">${l}</span>${on ? '<span class="mr-auto h-1.5 w-1.5 rounded-full bg-accent-500"></span>' : ''}</a></li>`).join('');
+  const bot = nl((p, i, l, on) => `<li class="min-w-0"><a class="group flex cursor-pointer flex-col items-center gap-0.5 rounded-md px-1 py-1.5 transition-colors duration-smooth ${on ? 'text-primary-700' : 'text-foreground-500 hover:text-primary-600'}" href="#${p}"><span class="flex h-8 w-8 items-center justify-center rounded-md transition-colors duration-smooth ${on ? 'bg-primary-100' : 'bg-transparent group-hover:bg-background-200'}"><i class="${i} text-[17px] leading-none"></i></span><span class="whitespace-nowrap text-[10px] font-medium leading-tight">${l}</span></a></li>`).join('');
+  const notes = NOTIFS.map(([ic, cl, t, s, w, u]) => `<li class="flex gap-3 px-4 py-3 transition-colors duration-smooth hover:bg-background-100"><span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${cl}"><i class="${ic} text-sm"></i></span><div class="min-w-0 flex-1"><div class="flex items-start justify-between gap-2"><p class="text-[13px] font-medium leading-snug text-foreground-900">${t}</p>${u ? '<span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary-500"></span>' : ''}</div><p class="mt-0.5 text-[11px] leading-relaxed text-foreground-600">${s}</p><p class="mt-1 text-[10px] text-foreground-400">${w}</p></div></li>`).join('');
+  const sub = (me.group_name || 'بدون حلقة');
+  return `<div class="min-h-[100dvh] w-full overflow-x-clip bg-background-100"><div class="mx-auto flex w-full max-w-[1600px]">
+<aside class="sticky top-0 hidden h-screen w-[272px] shrink-0 flex-col border-l border-background-200 bg-background-50 lg:flex"><div class="px-5 pb-5 pt-6"><a class="flex cursor-pointer items-center gap-3" href="#/"><span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary-700 font-heading text-[15px] font-semibold text-accent-200">ورد</span><span class="min-w-0"><span class="block font-heading text-[15px] font-semibold text-foreground-950">ورد المتربين</span><span class="block truncate text-[11px] text-foreground-500">منصة التربية والورد اليومي</span></span></a></div>
+<nav class="flex-1 overflow-y-auto px-3 no-scrollbar"><p class="px-3 pb-2 text-[11px] font-medium tracking-wide text-foreground-400">القائمة الرئيسية</p><ul class="space-y-1">${side}</ul></nav>
+<div class="space-y-3 px-4 pb-5">${lastStreak > 0 ? `<div class="rounded-lg border border-accent-200/80 bg-accent-50 p-3.5"><div class="flex items-center gap-2 text-accent-800"><span class="flex h-6 w-6 items-center justify-center"><i class="ri-fire-line text-base"></i></span><p class="text-xs font-semibold">${lastStreak} يومًا متتاليًا</p></div><p class="mt-1.5 text-[11px] leading-relaxed text-accent-900/80">استمر على وردك اليومي، فالقليل الدائم خير من الكثير المنقطع.</p></div>` : ''}
+<a class="flex cursor-pointer items-center gap-3 rounded-lg border border-background-200 bg-background-50 p-3 transition-colors duration-smooth hover:bg-background-100" href="#/more"><span class="flex h-9 w-9 items-center justify-center rounded-full bg-primary-100 font-heading text-sm font-semibold text-primary-800">${init}</span><span class="min-w-0 flex-1"><span class="block truncate text-[13px] font-medium text-foreground-900">${esc(me.full_name)}</span><span class="block truncate text-[11px] text-foreground-500">${esc(sub)}</span></span><span class="flex h-6 w-6 items-center justify-center text-foreground-400"><i class="ri-arrow-left-s-line text-base"></i></span></a></div></aside>
+<div class="flex min-h-[100dvh] w-full min-w-0 flex-1 flex-col"><header class="sticky top-0 z-30 border-b border-background-200 bg-background-100/90 backdrop-blur-md"><div class="mx-auto flex w-full max-w-[1180px] items-center justify-between gap-3 px-4 py-3 md:px-8"><div class="flex min-w-0 items-center gap-2.5"><a class="flex cursor-pointer items-center gap-2 lg:hidden" href="#/"><span class="flex h-8 w-8 items-center justify-center rounded-md bg-primary-700 font-heading text-[11px] font-semibold text-accent-200">ورد</span><span class="font-heading text-[13px] font-semibold text-foreground-950">ورد المتربين</span></a><div class="hidden min-w-0 lg:block"><p class="font-heading text-[13px] font-semibold text-foreground-900">${fW.format(d)} · ${fH.format(d)}</p><p class="text-[11px] text-foreground-500">${fG.format(d)}</p></div></div>
+<div class="flex items-center gap-2"><span class="hidden items-center gap-1.5 rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-[10.5px] text-primary-800 md:inline-flex"><i class="ri-verified-badge-line text-[12px]"></i>حساب معتمد</span>
+<div class="relative"><button type="button" id="bellb" class="relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-background-200 bg-background-50 text-foreground-700 transition-colors duration-smooth hover:bg-background-200" aria-label="الإشعارات"><i class="ri-notification-3-line text-base"></i><span class="absolute -top-1 -left-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-500 px-1 text-[9px] font-semibold text-accent-950">3</span></button>
+<div id="bellp" style="display:none"><div id="bello" class="fixed inset-0 z-40"></div><div class="fixed inset-x-3 top-[68px] z-50 overflow-hidden rounded-lg border border-background-200 bg-background-50 md:absolute md:inset-x-auto md:left-0 md:top-full md:mt-2 md:w-[370px]"><div class="flex items-center justify-between border-b border-background-200 px-4 py-3"><div><p class="font-heading text-sm font-semibold text-foreground-950">الإشعارات</p><p class="text-[11px] text-foreground-500">آخر التحديثات على وردك ومرحلتك</p></div><button type="button" id="bellc" class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-foreground-500 hover:bg-background-100" aria-label="إغلاق الإشعارات"><i class="ri-close-line text-base"></i></button></div><ul class="max-h-[60vh] divide-y divide-background-200 overflow-y-auto no-scrollbar">${notes}</ul><div class="border-t border-background-200 bg-background-100 px-4 py-2.5 text-center"><p class="text-[11px] text-foreground-500">عيّنة توضيحية: الإشعارات الحقيقية تأتي مع تفعيل التذكيرات</p></div></div></div></div>
+<a class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-primary-100 font-heading text-[13px] font-semibold text-primary-800 transition-colors duration-smooth hover:bg-primary-200" aria-label="حسابي" href="#/more">${init}</a></div></div></header>
+<main class="mx-auto w-full max-w-[1180px] flex-1 px-4 pb-28 pt-5 md:px-8 md:pt-7 lg:pb-14">${inner}</main></div></div>
+<nav class="fixed inset-x-0 bottom-0 z-40 border-t border-background-200 bg-background-50/95 backdrop-blur-md lg:hidden"><ul class="mx-auto grid max-w-2xl grid-cols-6 items-stretch px-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1.5">${bot}</ul></nav>`;
+}
+function draw(inner) {
+  $app.innerHTML = shell(inner); window.scrollTo(0, 0);
+  bellOpen = false;
+}
+document.addEventListener('click', e => {
+  const p = document.getElementById('bellp'); if (!p) return;
+  const hit = id => e.target.closest && e.target.closest('#' + id);
+  if (hit('bellb')) { bellOpen = !bellOpen; p.style.display = bellOpen ? 'block' : 'none'; }
+  else if ((hit('bello') || hit('bellc')) && bellOpen) { bellOpen = false; p.style.display = 'none'; }
+});
+const wrapS = inner => `<div class="space-y-4 md:space-y-5">${inner}</div>`;
+const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
+const UNIT = a => a.target_unit || 'مرة';
+function iconFor(a) { const t = a.title || ''; if (/قرآن/.test(t) || a.type === 'quran') return 'ri-book-open-line'; if (/صباح|مساء/.test(t)) return 'ri-sun-line'; if (/استغفار/.test(t)) return 'ri-heart-3-line'; if (/النبي/.test(t)) return 'ri-heart-line'; if (/صلوات|فرائض|جماعة/.test(t) || a.category === 'obligations') return 'ri-star-line'; if (a.category === 'worship') return 'ri-moon-line'; return 'ri-heart-line'; }
+const CAT_SUB = { obligations: 'أساس الورد اليومي', quran: 'وردك اليومي من الكتاب', dhikr: 'حصن اليوم', worship: 'صلة يومك بالله' };
+const CAT_ORDER = ['obligations', 'quran', 'dhikr', 'worship'];
+function meta(a) { if (a.type === 'counter') return `الهدف ${n2a(a.target_count || 1)} ${esc(UNIT(a))}`; if (a.type === 'quran') return `الهدف ${n2a(a.quran_parts || 1)} ${a.quran_unit === 'pages' ? 'صفحات' : 'أجزاء'}`; return 'إتمام مرة واحدة'; }
+async function loadMeCtx() {
+  if (me.group_name === undefined) { me.group_name = ''; try { if (me.group_id) { const g = await q('tarbiyah_groups', 'select=name,sheikh_name&id=eq.' + me.group_id); me.group_name = g[0] ? g[0].name : ''; me.sheikh_name = g[0] ? g[0].sheikh_name : ''; } } catch (e) { } }
+}
+async function stats(acts) {
+  const from = new Date(); from.setDate(from.getDate() - 60);
+  const logs = await q('wird_logs', `select=log_date,completed,activity_id&member_id=eq.${me.id}&completed=eq.true&log_date=gte.${ymd(from)}&limit=2000`);
+  const per = {}; logs.forEach(l => per[l.log_date] = (per[l.log_date] || 0) + 1);
+  const tot = acts.length; let streak = 0; const d = new Date(); if (!(tot && per[ymd(d)] >= tot)) d.setDate(d.getDate() - 1);
+  while (tot && per[ymd(d)] >= tot) { streak++; d.setDate(d.getDate() - 1); }
+  let week = 0; for (let i = 0; i < 7; i++) { const x = new Date(); x.setDate(x.getDate() - i); week += tot ? Math.min(1, (per[ymd(x)] || 0) / tot) : 0; }
+  let qual = 0; for (let i = 0; i < 30; i++) { const x = new Date(); x.setDate(x.getDate() - i); if (tot && (per[ymd(x)] || 0) / tot >= .8) qual++; }
+  lastStreak = streak; return { per, streak, week: Math.round(week / 7 * 100), qual };
+}
+function sample(t) { return `<span class="inline-flex items-center rounded-full border border-accent-300 bg-accent-100 px-1.5 py-0.5 text-[9px] font-medium text-accent-900">${t || 'عيّنة'}</span>`; }
+
+async function viewHome() {
+  await loadMeCtx();
+  const [acts, day, stages] = await Promise.all([loadActivities(), loadDay(me.id, today()), q('stages', 'select=*&order=order_index.asc')]);
+  const st = await stats(acts);
+  const total = acts.length, states = acts.map(a => [a, actState(a, day)]), done = states.filter(s => s[1].done).length, P = pct(done, total), rem = total - done;
+  const cur = stages.find(s => s.id === me.stage_id) || stages[0] || { name: 'المرحلة التمهيدية', min_days: 30 }, ci = Math.max(0, stages.findIndex(s => s.id === cur.id));
+  const need = cur.min_days || 30, elig = st.qual >= need;
+  const todayLogs = day.logs.filter(l => l.recorded_at).map(l => new Date(l.recorded_at)).sort((a, b) => b - a)[0];
+  const lastT = todayLogs ? `آخر تسجيل اليوم ${new Intl.DateTimeFormat('ar-EG', { hour: 'numeric', minute: '2-digit' }).format(todayLogs)}` : 'لم تسجّل شيئًا اليوم بعد';
+  const cats = CAT_ORDER.map(c => { const l = states.filter(s => s[0].category === c); return { c, name: CATS[c], d: l.filter(s => s[1].done).length, t: l.length }; }).filter(x => x.t);
+  const left = states.filter(s => !s[1].done);
+  const stepper = (stages.length ? stages : [cur]).map((s, i) => `<li class="min-w-0 flex-1"><div class="flex items-center"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${i < ci ? 'bg-primary-600 text-background-50' : i === ci ? 'bg-accent-500 text-accent-950' : 'border border-background-300 bg-background-100 text-foreground-400'}">${i + 1}</span>${i < stages.length - 1 ? '<span class="mx-1 h-px flex-1 bg-background-300"></span>' : ''}</div><p class="mt-2 truncate text-[10.5px] leading-tight ${i === ci ? 'font-semibold text-primary-800' : 'text-foreground-400'}">${esc(s.name)}</p><p class="mt-0.5 text-[9.5px] text-foreground-400">${i < ci ? 'مكتملة' : i === ci ? 'الحالية' : 'مقفلة'}</p></li>`).join('');
+  const card = (t, v, s, ic, cl, d, smp) => `<div class="animate-rise delay-${d} rounded-lg border border-background-200 bg-background-50 p-3.5 transition-colors duration-smooth hover:border-primary-200"><div class="flex items-start justify-between gap-2"><p class="text-[11px] text-foreground-500">${t}</p><span class="flex h-7 w-7 items-center justify-center rounded-md ${cl}"><i class="${ic} text-[13px]"></i></span></div><p class="num mt-2 text-xl font-semibold leading-none text-foreground-950 md:text-[22px]">${v}</p><p class="mt-1.5 truncate text-[10.5px] text-foreground-400">${s}${smp ? ' ' + sample() : ''}</p></div>`;
+  draw(wrapS(`
+<section class="animate-rise overflow-hidden rounded-lg border border-primary-800 bg-primary-800"><div class="pattern-emerald"><div class="flex flex-col gap-6 p-5 md:flex-row md:items-center md:justify-between md:gap-8 md:p-7"><div class="min-w-0"><span class="inline-flex items-center gap-1.5 rounded-full border border-accent-300/30 bg-accent-400/10 px-2.5 py-1 text-[11px] text-accent-200"><i class="ri-shield-check-line text-[13px]"></i>${esc(cur.name)} · ${esc(me.group_name || 'بدون حلقة')}</span>
+<h1 class="mt-3 font-heading text-[22px] font-semibold leading-snug text-background-50 md:text-[28px]">السلام عليكم، ${esc(me.full_name.split(' ')[0])}</h1>
+<p class="mt-1.5 max-w-[440px] text-[13px] leading-relaxed text-primary-100/85">${total ? (rem ? `بقي ${n2a(rem)} أوراد من ورد اليوم. خطوة صغيرة الآن، وأثر يبقى.` : 'ما شاء الله، أتممت ورد اليوم. ثبّتك الله.') : 'لم يضف الشيخ أوراد اليوم بعد.'}</p>
+<div class="mt-5 flex flex-wrap items-center gap-2.5"><a class="inline-flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-md bg-accent-500 px-4 py-2.5 text-[13px] font-semibold text-accent-950 transition-colors duration-smooth hover:bg-accent-400" href="#/ward">متابعة ورد اليوم<i class="ri-arrow-left-line text-sm"></i></a><a class="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md border border-primary-400/40 px-4 py-2.5 text-[13px] text-primary-50 transition-colors duration-smooth hover:bg-primary-700" href="#/progress">رحلتي في المراحل</a></div></div>
+<div class="flex items-center gap-5 md:gap-6"><div class="relative shrink-0 rounded-full" role="img" aria-label="نسبة الإنجاز ${P} بالمئة" style="width:138px;height:138px;background:conic-gradient(oklch(var(--accent-400)) ${P}%, oklch(var(--primary-950) / 0.55) ${P}% 100%)"><div class="absolute flex flex-col items-center justify-center rounded-full bg-primary-800" style="inset:9px"><span class="num text-[26px] font-semibold leading-none text-background-50">${n2a(done)}<span class="text-[15px] text-primary-200">/${n2a(total)}</span></span><span class="mt-1.5 text-[10px] text-primary-200">أوراد اليوم</span></div></div>
+<div class="space-y-2.5"><div><p class="num text-lg font-semibold leading-none text-background-50">${n2a(P)}%</p><p class="mt-1 text-[10.5px] text-primary-200">إنجاز اليوم</p></div><div class="h-px w-16 bg-primary-400/30"></div><div><p class="num text-lg font-semibold leading-none text-accent-300">${n2a(st.streak)}</p><p class="mt-1 text-[10.5px] text-primary-200">يوم متتالٍ</p></div></div></div></div></div>
+<div class="flex flex-wrap items-center justify-between gap-2 border-t border-primary-900/60 px-5 py-2.5 md:px-7"><p class="flex items-center gap-1.5 text-[10.5px] text-primary-200/80"><i class="ri-time-line text-[12px]"></i>${lastT} · يُقفل تسجيل اليوم بعد منتصف الليل</p><p class="text-[10.5px] text-primary-200/70">${fH.format(new Date())}</p></div></section>
+<div class="grid grid-cols-2 gap-3 md:grid-cols-4">${card('التزام الأسبوع', n2a(st.week) + '%', 'متوسط آخر ٧ أيام', 'ri-line-chart-line', 'bg-primary-100 text-primary-700', 1)}${card('أيام متتالية', n2a(st.streak), 'بدون انقطاع', 'ri-fire-line', 'bg-accent-100 text-accent-800', 2)}${card('ترتيب المجموعة', '٣/١٨', 'حسب التزام الشهر', 'ri-trophy-line', 'bg-secondary-100 text-secondary-700', 3, 1)}${card('الأيام المؤهلة', n2a(Math.min(st.qual, need)) + '/' + n2a(need), 'شروط الترقية', 'ri-shield-check-line', 'bg-primary-100 text-primary-700', 4)}</div>
+<a class="animate-rise flex cursor-pointer flex-col gap-2 rounded-lg border border-accent-200 bg-accent-50 px-4 py-3 transition-colors duration-smooth hover:border-accent-300 sm:flex-row sm:items-center sm:justify-between" href="#/progress"><div class="flex items-start gap-2.5"><span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent-500 text-accent-950"><i class="ri-trophy-line text-[14px]"></i></span><div><p class="text-[13px] font-semibold text-accent-950">${elig ? 'مؤهل للانتقال إلى ' + esc((stages[ci + 1] || cur).name) : 'في طريقك إلى ' + esc((stages[ci + 1] || cur).name)}</p><p class="text-[11px] text-accent-900/75">${elig ? `استوفيت ${n2a(Math.min(st.qual, need))} من ${n2a(need)} يومًا مؤهلاً · بانتظار اعتماد الشيخ` : `استوفيت ${n2a(st.qual)} من ${n2a(need)} يومًا مؤهلاً · يُحسب اليوم المؤهل عند إنجاز ٨٠٪ من الورد`}</p></div></div><span class="inline-flex shrink-0 items-center gap-1 text-[11.5px] font-medium text-accent-900">عرض شروط الترقية<i class="ri-arrow-left-s-line text-sm"></i></span></a>
+<div class="grid gap-4 md:gap-5 lg:grid-cols-[1.55fr_1fr]"><div class="space-y-4 md:space-y-5">
+<section class="rounded-lg border border-background-200 bg-background-50 p-4 md:p-5"><div class="mb-4 flex items-start justify-between gap-3"><div><h2 class="font-heading text-[15px] font-semibold text-foreground-950">رحلة المراحل</h2><p class="mt-0.5 text-[11.5px] text-foreground-500">أنت في ${esc(cur.name)} · المرحلة ${n2a(ci + 1)} من ${n2a(stages.length || 1)}</p></div><a class="inline-flex shrink-0 cursor-pointer items-center gap-1 whitespace-nowrap rounded-md border border-background-300 px-2.5 py-1.5 text-[11px] text-foreground-700 transition-colors duration-smooth hover:border-primary-300 hover:text-primary-700" href="#/progress">التفاصيل<i class="ri-arrow-left-s-line text-sm"></i></a></div><ol class="flex items-start gap-1.5">${stepper}</ol></section>
+<section class="rounded-lg border border-background-200 bg-background-50"><div class="flex items-start justify-between gap-3 border-b border-background-200 px-4 py-3.5 md:px-5"><div><h2 class="font-heading text-[15px] font-semibold text-foreground-950">ورد اليوم</h2><p class="mt-0.5 text-[11.5px] text-foreground-500">قالب معتمد من شيخك · لا يمكن تعديله</p></div><span class="num shrink-0 rounded-full bg-primary-50 px-2.5 py-1 text-[11px] font-medium text-primary-700">${n2a(done)} من ${n2a(total)}</span></div>
+<div class="space-y-3.5 px-4 py-4 md:px-5">${cats.map(c => `<div><div class="flex items-center justify-between gap-2"><p class="text-[12.5px] font-medium text-foreground-800">${c.name}</p><p class="num text-[11px] text-foreground-500">${n2a(c.d)}/${n2a(c.t)}</p></div><div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-background-200"><div class="h-full rounded-full transition-all duration-smooth ${c.d === c.t ? 'bg-primary-500' : 'bg-accent-500'}" style="width:${pct(c.d, c.t)}%"></div></div></div>`).join('') || '<p class="text-[12px] text-foreground-500">لا توجد أوراد بعد.</p>'}</div>
+<div class="border-t border-background-200 px-4 py-3.5 md:px-5">${left.length ? `<p class="mb-2 text-[11px] text-foreground-500">المتبقي من وردك</p><ul class="space-y-1.5">${left.map(([a]) => `<li class="flex items-center gap-2 text-[12px] text-foreground-700"><span class="flex h-4 w-4 items-center justify-center rounded-full border border-background-300"><span class="h-1.5 w-1.5 rounded-full bg-accent-500"></span></span><span class="min-w-0 flex-1 truncate">${esc(a.title)}</span><span class="num shrink-0 text-[10.5px] text-foreground-400">${meta(a)}</span></li>`).join('')}</ul>` : '<p class="text-[12px] text-primary-700">أتممت كل أوراد اليوم، بارك الله فيك.</p>'}<a class="mt-3 inline-flex w-full cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-primary-600 px-3 py-2.5 text-[12.5px] font-medium text-background-50 transition-colors duration-smooth hover:bg-primary-700" href="#/ward">فتح ورد اليوم<i class="ri-arrow-left-line text-[13px]"></i></a></div></section></div>
+<div class="space-y-4 md:space-y-5">
+<section class="overflow-hidden rounded-lg border border-accent-200 bg-accent-50"><div class="pattern-gold px-4 py-4"><div class="flex items-center justify-between gap-2"><span class="inline-flex items-center gap-1.5 rounded-full bg-accent-500 px-2.5 py-1 text-[10.5px] font-semibold text-accent-950"><i class="ri-calendar-line text-[11px]"></i>جارية الآن</span><span class="num text-[11px] text-accent-800">بقي ٩ أيام ${sample()}</span></div><h2 class="mt-2.5 font-heading text-[16px] font-semibold text-accent-950">صيام الست من شوال</h2><p class="mt-1 text-[11.5px] leading-relaxed text-accent-900/80">صيام ٦ أيام · ٤٦ مشاركًا</p><div class="mt-3.5 flex items-center gap-3"><div class="h-1.5 flex-1 overflow-hidden rounded-full bg-accent-200/70"><div class="h-full rounded-full bg-accent-600" style="width:67%"></div></div><span class="num shrink-0 text-[11px] font-medium text-accent-900">٦٧%</span></div><div class="mt-4 flex items-center justify-between gap-2"><div class="flex items-center gap-1.5 text-[11px] text-accent-900"><i class="ri-trophy-line text-[13px]"></i>ترتيبك ٤ من ٤٦</div><a class="inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-md bg-accent-950 px-3 py-1.5 text-[11.5px] font-medium text-accent-50 transition-colors duration-smooth hover:bg-accent-900" href="#/seasons/shawwal-six">التفاصيل<i class="ri-arrow-left-s-line text-sm"></i></a></div></div></section>
+<section class="rounded-lg border border-background-200 bg-background-50"><div class="flex items-center justify-between gap-2 border-b border-background-200 px-4 py-3"><h2 class="flex items-center gap-2 font-heading text-[14px] font-semibold text-foreground-950">إعلانات شيخي ${sample()}</h2><a class="cursor-pointer text-[11px] text-primary-700 hover:underline" href="#/group">الكل</a></div><ul class="divide-y divide-background-200">${[['مجلس التربية الأسبوعي', 'يُعقد مجلس التربية هذا الأسبوع مساء الخميس بعد صلاة العشاء، والحضور جزء من متطلبات المرحلة.', 'الشيخ · أمس'], ['بدء التسجيل في موسم العشر من ذي الحجة', 'فُتح التسجيل في موسم العشر. يمكنك اختيار الأوراد التي ترغب بالمنافسة فيها قبل بداية الموسم.', 'إدارة الحلقة · قبل يومين'], ['تذكير بورد القرآن', 'من لم يكمل ورد القرآن اليوم فليبدأ بأقل القليل ولا يتركه، فالقليل الدائم خير من الكثير المنقطع.', 'الشيخ · قبل ٣ أيام']].map(a => `<li class="px-4 py-3 transition-colors duration-smooth hover:bg-background-100"><p class="text-[12.5px] font-medium text-foreground-900">${a[0]}</p><p class="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-foreground-500">${a[1]}</p><p class="mt-1 text-[10px] text-foreground-400">${a[2]}</p></li>`).join('')}</ul></section></div></div>
+<p class="pt-1 text-center text-[10.5px] leading-relaxed text-foreground-400">الأقسام الموسومة بـ «عيّنة» بيانات توضيحية لحين تفعيل المواسم والترتيب. أورادك وتقدّمك محفوظة فعليًا في حسابك.</p>`));
+}
+
+/* ward */
+let syncT;
+function setSync(s) {
+  const el = document.getElementById('sync'); if (!el) return; clearTimeout(syncT);
+  const M = { idle: ['ri-save-3-line', 'يُحفظ تلقائيًا', 'border-primary-200 bg-primary-50 text-primary-800'], saving: ['ri-loader-4-line animate-spin', 'جارٍ الحفظ…', 'border-accent-200 bg-accent-50 text-accent-900'], ok: ['ri-check-line', 'تم الحفظ', 'border-primary-300 bg-primary-100 text-primary-800'], err: ['ri-error-warning-line', 'تعذّر الحفظ', 'border-background-300 bg-secondary-100 text-secondary-900'] }[s];
+  el.className = 'inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-1 text-[10px] ' + M[2]; el.innerHTML = `<i class="${M[0]} text-[11px]"></i>${M[1]}`;
+  if (s === 'ok') syncT = setTimeout(() => setSync('idle'), 2000);
+}
+function wardArticle(a) {
+  const st = actState(a, ctx.day), done = st.done, ic = iconFor(a);
+  const badge = { toggle: 'إتمام بسيط', counter: 'عدّاد', quran: 'ورد قرآن' }[a.type];
+  const head = `<div class="flex items-start gap-3"><span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md ${done ? 'bg-primary-100 text-primary-700' : 'bg-background-100 text-foreground-500'}"><i class="${ic} text-base"></i></span><div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-x-2 gap-y-1"><h3 class="text-[13px] font-medium leading-snug ${done ? 'text-foreground-600' : 'text-foreground-950'}">${esc(a.title)}</h3><span class="rounded-full border border-background-300 bg-background-100 px-2 py-0.5 text-[10px] text-foreground-500">${badge}</span>${done ? '<span class="inline-flex items-center gap-0.5 rounded-full bg-primary-100 px-2 py-0.5 text-[10px] text-primary-800"><i class="ri-check-double-line text-[11px]"></i>مكتمل</span>' : ''}</div>${a.description ? `<p class="mt-1 text-[11px] leading-relaxed text-foreground-500">${esc(a.description)}</p>` : ''}<p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-foreground-500"><span class="num">${meta(a)}</span></p></div>`;
+  const wrap = body => `<article class="rounded-lg border p-3.5 transition-colors duration-smooth ${done ? 'border-primary-200 bg-primary-50' : 'border-background-200 bg-background-50'}">${body}</article>`;
+  if (a.type === 'toggle') return wrap(head + `<button type="button" data-a="${a.id}" data-k="t" aria-pressed="${done}" aria-label="${done ? 'إلغاء تسجيل ' : 'تسجيل '}${esc(a.title)}" class="mt-0.5 flex h-9 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md border px-3 text-[11.5px] transition-colors duration-smooth ${done ? 'border-primary-300 bg-primary-100 text-primary-800 hover:bg-primary-200' : 'border-background-300 bg-background-50 text-foreground-700 hover:border-primary-300 hover:bg-background-100'}"><i class="${done ? 'ri-check-line' : 'ri-add-line'} text-[13px]"></i>${done ? 'تم' : 'تسجيل'}</button></div>`);
+  if (a.type === 'counter') return wrap(head + `</div><div class="mt-3 rounded-md border border-background-200 bg-background-100/70 p-2.5"><div class="flex items-center justify-between gap-2"><button type="button" data-a="${a.id}" data-k="m" ${st.val <= 0 ? 'disabled' : ''} aria-label="إنقاص عدد ${esc(a.title)}" class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-background-300 bg-background-50 text-foreground-700 transition-colors duration-smooth hover:bg-background-200 disabled:cursor-not-allowed disabled:opacity-40"><i class="ri-subtract-line text-[14px]"></i></button><div class="min-w-0 flex-1 text-center"><p class="num text-[16px] font-semibold leading-none text-foreground-950">${n2a(st.val)}<span class="text-[11px] font-normal text-foreground-400"> / ${n2a(st.total)}</span></p><p class="mt-1 text-[10px] text-foreground-500">الهدف اليومي ${n2a(st.total)} ${esc(UNIT(a))}</p></div><button type="button" data-a="${a.id}" data-k="p" aria-label="زيادة عدد ${esc(a.title)}" class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-primary-300 bg-primary-600 text-background-50 transition-colors duration-smooth hover:bg-primary-700"><i class="ri-add-line text-[14px]"></i></button></div><div class="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-background-200"><div class="h-full rounded-full bg-primary-500 transition-all duration-smooth" style="width:${Math.min(100, pct(st.val, st.total))}%"></div></div></div>`);
+  const lbl = a.quran_unit === 'pages' ? 'الصفحة' : 'الجزء';
+  return wrap(head + `</div><div class="mt-3"><p class="num text-[10.5px] text-foreground-500">سجّلت ${n2a(st.val)} من ${n2a(st.total)}</p><div class="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-3">${Array.from({ length: st.total }, (_, i) => { const on = st.got.includes(i); return `<button type="button" data-a="${a.id}" data-k="q" data-i="${i}" aria-pressed="${on}" class="flex cursor-pointer items-center justify-between gap-1.5 rounded-md border px-2.5 py-2 text-[11px] transition-colors duration-smooth ${on ? 'border-primary-300 bg-primary-100 text-primary-800' : 'border-background-300 bg-background-50 text-foreground-600 hover:border-primary-300 hover:bg-background-100'}"><span class="whitespace-nowrap">${lbl} ${n2a(i + 1)}</span><span class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${on ? 'border-primary-600 bg-primary-600 text-background-50' : 'border-background-300 text-transparent'}"><i class="ri-check-line text-[10px]"></i></span></button>`; }).join('')}</div><div class="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-background-200"><div class="h-full rounded-full bg-primary-500 transition-all duration-smooth" style="width:${pct(st.val, st.total)}%"></div></div></div>`);
+}
 async function viewWard() {
   const [acts, day] = await Promise.all([loadActivities(), loadDay(me.id, today())]);
   ctx.acts = acts; ctx.day = day;
-  const draw = () => {
-    const done = acts.filter(a => actState(a, ctx.day).done).length;
-    $app.innerHTML = `<div class="page"><header class="top"><div><h1>وردي اليوم</h1><small>${esc(me.full_name)} · ${n2a(new Date().getDate())} ${MONTHS[new Date().getMonth()]}</small></div><div class="logo">ورد</div></header>
-<div class="card"><div class="row sp"><b>التقدم</b><span class="pill">${n2a(done)} / ${n2a(acts.length)}</span></div><div class="bar" style="margin-top:8px"><i style="width:${acts.length ? done / acts.length * 100 : 0}%"></i></div></div>
-${acts.length ? acts.map(a => actCard(a)).join('') : '<div class="card center muted">لا توجد أنشطة بعد. سيضيفها الشيخ.</div>'}
-<p class="muted small center">كل ما سجّلته اليوم محفوظ في حسابك ويراه الشيخ والمشرفون.</p></div>${tabs('/ward')}`;
-    bindWard(draw);
+  const paint = () => {
+    const sts = acts.map(a => actState(a, ctx.day)), done = sts.filter(s => s.done).length, partial = sts.filter(s => !s.done && s.val > 0).length, total = acts.length, P = pct(done, total), rem = total - done, d = new Date();
+    const sec = CAT_ORDER.map(c => { const l = acts.filter(a => a.category === c); if (!l.length) return ''; const dn = l.filter(a => actState(a, ctx.day).done).length; return `<section class="animate-fade"><div class="mb-2 flex items-end justify-between gap-2 px-1"><div><h2 class="font-heading text-[13.5px] font-semibold text-foreground-950">${CATS[c]}</h2><p class="text-[10.5px] text-foreground-400">${CAT_SUB[c]}</p></div><p class="num shrink-0 text-[11px] text-foreground-500">${n2a(dn)}/${n2a(l.length)}</p></div><div class="space-y-2">${l.map(wardArticle).join('')}</div></section>`; }).join('');
+    const y = window.scrollY;
+    draw(wrapS(`<div class="animate-rise rounded-lg border border-background-200 bg-background-50"><div class="flex items-center justify-between gap-2 border-b border-background-200 px-3 py-2.5"><div class="flex items-center gap-1.5 text-[11.5px] text-foreground-500"><i class="ri-calendar-event-line text-[13px]"></i>${fG.format(d)}</div><div class="flex items-center gap-1.5"><a class="inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-full border border-background-300 bg-background-50 px-2.5 py-1 text-[10px] text-foreground-700 transition-colors duration-smooth hover:bg-background-200" href="#/ward/history"><i class="ri-calendar-2-line text-[11px]"></i>سجل الشهر</a><span id="sync"></span></div></div>
+<div class="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between md:p-5"><div class="flex items-center gap-4"><div class="relative shrink-0 rounded-full" role="img" aria-label="نسبة الإنجاز ${P} بالمئة" style="width:92px;height:92px;background:conic-gradient(oklch(var(--primary-500)) ${P}%, oklch(var(--background-200)) ${P}% 100%)"><div class="absolute flex flex-col items-center justify-center rounded-full bg-background-50" style="inset:7px"><span class="num text-[19px] font-semibold leading-none text-foreground-950">${n2a(done)}<span class="text-[12px] text-foreground-400">/${n2a(total)}</span></span><span class="mt-1 text-[9px] text-foreground-400">مكتمل</span></div></div><div><p class="text-[11.5px] text-foreground-500">${esc(me.full_name)}</p><h1 class="mt-0.5 font-heading text-lg font-semibold text-foreground-950">ورد اليوم</h1><p class="mt-1 text-[11.5px] text-foreground-500">بقي ${n2a(rem)} أوراد · ${n2a(P)}% إنجاز</p><p class="mt-0.5 text-[10.5px] text-foreground-400">${fH.format(d)}</p></div></div>
+<div class="grid w-full grid-cols-3 gap-2 sm:w-auto sm:min-w-[260px]"><div class="rounded-md border border-primary-200 bg-primary-50 px-2 py-2 text-center"><p class="num text-[15px] font-semibold leading-none text-primary-800">${n2a(done)}</p><p class="mt-1 text-[9.5px] text-primary-700">مكتمل</p></div><div class="rounded-md border border-secondary-200 bg-secondary-50 px-2 py-2 text-center"><p class="num text-[15px] font-semibold leading-none text-secondary-900">${n2a(partial)}</p><p class="mt-1 text-[9.5px] text-secondary-800">قيد الإنجاز</p></div><div class="rounded-md border border-background-300 bg-background-100 px-2 py-2 text-center"><p class="num text-[15px] font-semibold leading-none text-foreground-800">${n2a(total - done - partial)}</p><p class="mt-1 text-[9.5px] text-foreground-500">لم يبدأ</p></div></div></div>
+<div class="border-t border-background-200 bg-background-100 px-4 py-2.5"><p class="flex items-start gap-1.5 text-[10.5px] leading-relaxed text-foreground-500"><i class="ri-lock-line mt-0.5 text-[12px]"></i>القالب معتمد من شيخك ولا يمكن تعديله. الورد غير المسجل يبقى غير مسجل ولا يُحتسب تلقائيًا، وسجل اليوم يُغلق بعد منتصف الليل.</p></div></div>
+${sec || '<div class="rounded-lg border border-background-200 bg-background-50 p-6 text-center text-[12px] text-foreground-500">لا توجد أوراد بعد. سيضيفها الشيخ.</div>'}`));
+    window.scrollTo(0, y); setSync(ctx.syncState || 'idle'); bindWard(paint);
   };
-  draw();
+  paint();
 }
-function actCard(a) {
-  const st = actState(a, ctx.day), emo = CAT_EMO[a.category] || '✨';
-  if (a.type === 'toggle') return `<div class="item ${st.done ? 'done' : ''}"><button class="chk ${st.done ? 'on' : ''}" data-a="${a.id}" data-k="t">${st.done ? '✓' : ''}</button><div class="grow"><div class="t">${esc(a.title)}</div><div class="s">${st.done ? '✓ تم التسجيل · اضغط للتراجع' : esc(a.description || CATS[a.category] || '')}</div></div><span class="emo">${emo}</span></div>`;
-  if (a.type === 'counter') return `<div class="item ${st.done ? 'done' : ''}" style="display:block"><div class="row"><div class="grow"><div class="t">${esc(a.title)}</div><div class="s">${n2a(st.val)} من ${n2a(st.total)} ${esc(a.target_unit || '')}</div></div><span class="emo">${emo}</span></div>
-<div class="cnt"><button data-a="${a.id}" data-k="p">+</button><div class="bar"><i style="width:${Math.min(100, st.val / st.total * 100)}%"></i></div><button data-a="${a.id}" data-k="m">−</button></div></div>`;
-  const label = a.quran_unit === 'pages' ? 'صفحة' : 'جزء';
-  return `<div class="item ${st.done ? 'done' : ''}" style="display:block"><div class="row"><div class="grow"><div class="t">${esc(a.title)}</div><div class="s">${n2a(st.val)} من ${n2a(st.total)} ${label} · اضغط على كل ${label} بعد قراءته</div></div><span class="emo">${emo}</span></div>
-<div class="parts">${Array.from({ length: st.total }, (_, i) => `<button class="part ${st.got.includes(i) ? 'on' : ''}" data-a="${a.id}" data-k="q" data-i="${i}">${label} ${n2a(i + 1)}</button>`).join('')}</div></div>`;
-}
-function bindWard(draw) {
+function bindWard(paint) {
   $app.querySelectorAll('[data-a]').forEach(el => el.onclick = async () => {
     const a = ctx.acts.find(x => x.id === el.dataset.a), k = el.dataset.k, day = ctx.day, prev = JSON.stringify(day);
+    const log = day.logs.find(l => l.activity_id === a.id);
+    const put = (completed, counter) => { const l = day.logs.find(l => l.activity_id === a.id); if (l) { l.completed = completed; l.counter_value = counter; } else day.logs.push({ activity_id: a.id, completed, counter_value: counter }); };
     try {
-      const log = day.logs.find(l => l.activity_id === a.id);
-      const put = (completed, counter) => { if (log) { log.completed = completed; log.counter_value = counter; } else day.logs.push({ activity_id: a.id, completed, counter_value: counter }); };
-      if (k === 't') { const c = !(log && log.completed); put(c, 0); draw(); await setLog(a, c, 0); }
-      else if (k === 'p' || k === 'm') { const v = Math.max(0, (log ? log.counter_value : 0) + (k === 'p' ? 1 : -1)); const c = v >= (a.target_count || 1); put(c, v); draw(); await setLog(a, c, v); }
+      ctx.syncState = 'saving';
+      if (k === 't') { const c = !(log && log.completed); put(c, 0); paint(); await setLog(a, c, 0); }
+      else if (k === 'p' || k === 'm') { const v = Math.max(0, (log ? log.counter_value : 0) + (k === 'p' ? 1 : -1)); const c = v >= (a.target_count || 1); put(c, v); paint(); await setLog(a, c, v); }
       else {
         const i = +el.dataset.i, has = day.parts.find(p => p.activity_id === a.id && p.part_index === i);
-        if (has) { day.parts = day.parts.filter(p => p !== has); draw(); await del('wird_part_logs', `member_id=eq.${me.id}&activity_id=eq.${a.id}&log_date=eq.${today()}&part_index=eq.${i}`); }
-        else { day.parts.push({ activity_id: a.id, part_index: i, completed: true }); draw(); await api('/rest/v1/wird_part_logs?on_conflict=member_id,activity_id,log_date,part_index', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' }, body: { tenant_id: TENANT, member_id: me.id, activity_id: a.id, log_date: today(), part_index: i, completed: true } }); }
+        if (has) { day.parts = day.parts.filter(p => p !== has); paint(); await del('wird_part_logs', `member_id=eq.${me.id}&activity_id=eq.${a.id}&log_date=eq.${today()}&part_index=eq.${i}`); }
+        else { day.parts.push({ activity_id: a.id, part_index: i, completed: true }); paint(); await api('/rest/v1/wird_part_logs?on_conflict=member_id,activity_id,log_date,part_index', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' }, body: { tenant_id: TENANT, member_id: me.id, activity_id: a.id, log_date: today(), part_index: i, completed: true } }); }
         const st = actState(a, day); put(st.done, 0); await setLog(a, st.done, 0);
       }
-    } catch (e) { ctx.day = JSON.parse(prev); draw(); toast('تعذّر الحفظ: ' + errAr(e)); }
+      ctx.syncState = 'ok'; setSync('ok'); ctx.syncState = 'idle';
+    } catch (e) { ctx.day = JSON.parse(prev); ctx.syncState = 'err'; paint(); toast('تعذّر الحفظ: ' + errAr(e)); ctx.syncState = 'idle'; }
   });
 }
 
-async function viewHome() {
-  const [acts, day, st] = await Promise.all([loadActivities(), loadDay(me.id, today()), me.stage_id ? q('stages', 'select=*&id=eq.' + me.stage_id) : Promise.resolve([])]);
-  const done = acts.filter(a => actState(a, day).done).length;
-  // streak: consecutive days (ending today/yesterday) with all done
-  const from = new Date(); from.setDate(from.getDate() - 60);
-  const logs = await q('wird_logs', `select=log_date,completed&member_id=eq.${me.id}&completed=eq.true&log_date=gte.${ymd(from)}`);
-  const per = {}; logs.forEach(l => per[l.log_date] = (per[l.log_date] || 0) + 1);
-  let streak = 0; const d = new Date(); if (!(per[ymd(d)] >= acts.length && acts.length)) d.setDate(d.getDate() - 1);
-  while (acts.length && per[ymd(d)] >= acts.length) { streak++; d.setDate(d.getDate() - 1); }
-  $app.innerHTML = `<div class="page"><header class="top"><div><h1>السلام عليكم، ${esc(me.full_name.split(' ')[0])}</h1><small>${isStaff() ? 'الشيخ' : CATEGORY[me.category] || ''}</small></div><div class="logo">ورد</div></header>
-<div class="card"><div class="row sp"><b>ورد اليوم</b><span class="pill">${n2a(done)} / ${n2a(acts.length)}</span></div><div class="bar" style="margin:8px 0"><i style="width:${acts.length ? done / acts.length * 100 : 0}%"></i></div><a class="btn block" href="#/ward">${done >= acts.length && acts.length ? 'راجع وردك' : 'سجّل وردك الآن'}</a></div>
-<div class="stats"><div class="stat"><b>${n2a(streak)}</b>أيام متتالية</div><div class="stat"><b>${st[0] ? esc(st[0].name) : '—'}</b>المرحلة الحالية</div></div>
-${st[0] ? `<div class="card"><h3>${esc(st[0].name)}</h3><p class="muted">${esc(st[0].purpose || '')}</p>${(st[0].requirements || []).map(r => `<div class="small">• ${esc(r)}</div>`).join('')}</div>` : ''}
-</div>${tabs('/')}`;
+/* history */
+async function viewHistory() {
+  const acts = await loadActivities(), st = ctx.hist || (ctx.hist = { y: new Date().getFullYear(), m: new Date().getMonth(), sel: today() });
+  const first = new Date(st.y, st.m, 1), nd = new Date(st.y, st.m + 1, 0).getDate(), a = ymd(first), b = ymd(new Date(st.y, st.m, nd));
+  const [logs, parts] = await Promise.all([q('wird_logs', `select=log_date,activity_id,completed,counter_value&member_id=eq.${me.id}&log_date=gte.${a}&log_date=lte.${b}&limit=2000`), q('wird_part_logs', `select=log_date,activity_id,part_index&member_id=eq.${me.id}&completed=eq.true&log_date=gte.${a}&log_date=lte.${b}&limit=3000`)]);
+  const tot = acts.length, dayState = date => { const l = logs.filter(x => x.log_date === date), p = parts.filter(x => x.log_date === date); const r = acts.map(ac => actState(ac, { logs: l, parts: p })); return { done: r.filter(x => x.done).length, any: r.filter(x => x.done || x.val > 0).length, r }; };
+  const t = today(), days = []; for (let d = 1; d <= nd; d++) { const date = st.y + '-' + pad(st.m + 1) + '-' + pad(d); days.push({ d, date, ...(date <= t ? dayState(date) : { done: 0, any: 0, r: [] }) }); }
+  const past = days.filter(x => x.date <= t), full = past.filter(x => tot && x.done >= tot).length, recd = past.filter(x => x.any).length, avg = past.length && tot ? Math.round(past.reduce((s, x) => s + x.done / tot, 0) / past.length * 100) : 0;
+  let best = 0, run = 0; past.forEach(x => { if (tot && x.done >= tot) { run++; best = Math.max(best, run); } else run = 0; });
+  const lead = first.getDay(); // week starts Sunday
+  const cell = x => { const f = tot && x.done >= tot, any = x.any > 0, fut = x.date > t, ratio = tot ? x.done / tot : 0; const cl = fut ? 'border-background-200 bg-background-50 text-foreground-300' : f ? 'border-primary-600 bg-primary-600 text-background-50' : ratio >= .5 ? 'border-primary-300 bg-primary-300 text-primary-950' : any ? 'border-primary-200 bg-primary-100 text-primary-900' : x.date === t ? 'border-background-300 bg-background-100 text-foreground-600' : 'border-background-200 bg-background-100 text-foreground-500'; return `<button type="button" data-date="${x.date}" ${fut ? 'disabled' : ''} aria-pressed="${x.date === st.sel}" class="flex h-12 cursor-pointer flex-col items-center justify-center rounded-md border transition-colors duration-smooth ${cl} ${x.date === st.sel ? 'ring-2 ring-accent-500' : ''} disabled:cursor-default"><span class="num text-[12px] font-semibold leading-none ${x.date === t ? 'underline' : ''}">${n2a(x.d)}</span><span class="num mt-1 text-[8.5px] leading-none opacity-80">${fut ? '—' : n2a(x.done) + '/' + n2a(tot)}</span></button>`; };
+  const sd = days.find(x => x.date === st.sel) || days[0], sdP = tot ? Math.round(sd.done / tot * 100) : 0;
+  const chip = sd.date > t ? ['bg-background-100 text-foreground-500', 'ri-time-line', 'قادم'] : tot && sd.done >= tot ? ['bg-primary-100 text-primary-800', 'ri-check-double-line', 'مكتمل'] : sd.any ? ['bg-accent-100 text-accent-900', 'ri-progress-3-line', 'جزئي'] : ['bg-secondary-100 text-secondary-900', 'ri-close-circle-line', 'لم يُسجل'];
+  const sc = (t_, v, ic, cl) => `<div class="rounded-lg border border-background-200 bg-background-50 p-3"><div class="flex items-center justify-between gap-2"><p class="text-[10.5px] text-foreground-500">${t_}</p><span class="flex h-7 w-7 items-center justify-center rounded-md ${cl}"><i class="${ic} text-[13px]"></i></span></div><p class="num mt-1.5 text-[19px] font-semibold leading-none text-foreground-950">${v}</p></div>`;
+  const nb = 'flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-background-300 bg-background-50 text-foreground-600 transition-colors duration-smooth hover:bg-background-200';
+  const isNow = st.y === new Date().getFullYear() && st.m === new Date().getMonth();
+  draw(wrapS(`<header class="animate-rise flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><div class="flex items-center gap-2"><a class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-background-300 bg-background-50 text-foreground-600 transition-colors duration-smooth hover:bg-background-200" aria-label="العودة إلى ورد اليوم" href="#/ward"><i class="ri-arrow-right-s-line text-[15px]"></i></a><h1 class="font-heading text-xl font-semibold text-foreground-950 md:text-2xl">سجل وردي</h1></div><p class="mt-1 text-[12px] leading-relaxed text-foreground-500">تقويم شهري يوضح إنجازك اليومي من الأوراد، مع تفصيل كل يوم.</p></div><a class="inline-flex cursor-pointer items-center gap-1.5 self-start whitespace-nowrap rounded-md bg-primary-700 px-3.5 py-2 text-[11.5px] font-medium text-background-50 transition-colors duration-smooth hover:bg-primary-800 sm:self-auto" href="#/ward"><i class="ri-checkbox-circle-line text-[13px]"></i>تسجيل ورد اليوم</a></header>
+<section class="animate-rise delay-1 grid grid-cols-2 gap-2.5 lg:grid-cols-4">${sc('أيام مكتملة', n2a(full), 'ri-calendar-check-line', 'bg-primary-100 text-primary-700')}${sc('متوسط الإنجاز', n2a(avg) + '%', 'ri-line-chart-line', 'bg-secondary-100 text-secondary-900')}${sc('أيام مسجّلة', n2a(recd), 'ri-checkbox-circle-line', 'bg-accent-100 text-accent-900')}${sc('أطول سلسلة', n2a(best), 'ri-fire-line', 'bg-primary-100 text-primary-700')}</section>
+<div class="animate-fade grid gap-4 lg:grid-cols-[1.55fr_1fr]"><div class="rounded-lg border border-background-200 bg-background-50"><div class="flex items-center justify-between gap-2 border-b border-background-200 px-3 py-2.5"><button type="button" id="hp" aria-label="الشهر السابق" class="${nb}"><i class="ri-arrow-right-s-line text-[16px]"></i></button><div class="text-center"><p class="font-heading text-[13px] font-semibold text-foreground-950">${MONTHS[st.m]} ${n2a(st.y)}</p><p class="text-[10px] text-foreground-400">سجل الورد اليومي</p></div><div class="flex items-center gap-1"><button type="button" id="hn0" class="cursor-pointer whitespace-nowrap rounded-md border border-background-300 bg-background-50 px-2 py-1 text-[10px] text-foreground-600 transition-colors duration-smooth hover:bg-background-200">هذا الشهر</button><button type="button" id="hn" ${isNow ? 'disabled' : ''} aria-label="الشهر التالي" class="${nb} disabled:cursor-not-allowed disabled:opacity-40"><i class="ri-arrow-left-s-line text-[16px]"></i></button></div></div>
+<div class="p-3"><div class="grid grid-cols-7 gap-1">${['أحد', 'اثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة', 'سبت'].map(n => `<div class="pb-1.5 text-center text-[9.5px] font-medium text-foreground-400">${n}</div>`).join('')}${'<div></div>'.repeat(lead)}${days.map(cell).join('')}</div>
+<div class="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-background-200 pt-2.5"><div class="flex flex-wrap items-center gap-2">${[['border-background-300 bg-background-100', 'لم يُسجّل'], ['border-primary-200 bg-primary-100', 'بداية'], ['border-primary-300 bg-primary-300', 'جزئي'], ['border-primary-600 bg-primary-600', 'مكتمل']].map(([c, l]) => `<span class="flex items-center gap-1 text-[9.5px] text-foreground-500"><span class="h-2.5 w-2.5 rounded-sm border ${c}"></span>${l}</span>`).join('')}</div></div></div></div>
+<div class="space-y-3"><div class="rounded-lg border border-background-200 bg-background-50"><div class="border-b border-background-200 px-3.5 py-3"><div class="flex items-start justify-between gap-2"><div class="min-w-0"><h2 class="font-heading text-[12.5px] font-semibold text-foreground-950">${fG.format(new Date(sd.date + 'T12:00:00'))}</h2><p class="num mt-0.5 text-[10.5px] text-foreground-500">${n2a(sd.done)} من ${n2a(tot)} أوراد · ${n2a(sdP)}%</p></div><span class="flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] ${chip[0]}"><i class="${chip[1]} text-[11px]"></i>${chip[2]}</span></div><div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-background-200"><div class="h-full rounded-full transition-all duration-smooth ${sdP === 100 ? 'bg-primary-500' : 'bg-accent-500'}" style="width:${sdP}%"></div></div></div>
+<ul class="divide-y divide-background-200">${acts.map((ac, i) => { const r = sd.r[i] || { done: false, val: 0 }; return `<li class="flex items-start gap-2.5 px-3.5 py-2.5"><span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${r.done ? 'bg-primary-100 text-primary-700' : 'bg-background-100 text-foreground-500'}"><i class="${iconFor(ac)} text-[14px]"></i></span><div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-x-2 gap-y-0.5"><p class="text-[11.5px] font-medium leading-snug text-foreground-900">${esc(ac.title)}</p><span class="rounded-full bg-background-100 px-1.5 py-0.5 text-[9px] text-foreground-500">${{ toggle: 'إتمام بسيط', counter: 'عدّاد', quran: 'ورد قرآن' }[ac.type]}</span></div><p class="num mt-0.5 text-[10px] text-foreground-500">${r.done ? 'مكتمل' : r.val > 0 ? n2a(r.val) + (ac.type === 'counter' ? ' من ' + n2a(r.total) : ' من ' + n2a(r.total) + ' أجزاء') : 'لم يُسجّل'}</p></div><span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${r.done ? 'bg-primary-600 text-background-50' : 'bg-background-100 text-foreground-400'}"><i class="${r.done ? 'ri-check-line' : 'ri-close-line'} text-[11px]"></i></span></li>`; }).join('')}</ul></div></div></div>`));
+  const re = () => viewHistory();
+  document.getElementById('hp').onclick = () => { st.m--; if (st.m < 0) { st.m = 11; st.y--; } st.sel = ymd(new Date(st.y, st.m, 1)); re(); };
+  document.getElementById('hn').onclick = () => { st.m++; if (st.m > 11) { st.m = 0; st.y++; } st.sel = ymd(new Date(st.y, st.m, 1)); re(); };
+  document.getElementById('hn0').onclick = () => { const n = new Date(); st.y = n.getFullYear(); st.m = n.getMonth(); st.sel = today(); re(); };
+  $app.querySelectorAll('[data-date]').forEach(el => el.onclick = () => { st.sel = el.dataset.date; re(); });
 }
+
+/* static (sample) pages from the Readdy design */
+async function viewStatic(k) {
+  await loadMeCtx();
+  let h = PG[k].split('أحمد بن سالم العتيبي').join(esc(me.full_name));
+  if (k === 'group') { h = h.split('حلقة الفرقان').join('حلقتي'); }
+  draw(h);
+  if (k === 'seasons') bindSeasonTabs();
+}
+function bindSeasonTabs() {
+  const btns = [...$app.querySelectorAll('main button')].filter(b => ['الكل', 'جارية', 'قادمة', 'منتهية'].includes(b.textContent.trim()));
+  const grid = [...$app.querySelectorAll('main .grid')].find(g => g.children.length >= 3 && /متابعة الموسم|التفاصيل والتسجيل|النتائج النهائية/.test(g.textContent));
+  if (!btns.length || !grid) return;
+  const on = btns[0].className, off = btns[1].className;
+  const map = { 'الكل': null, 'جارية': 'جارية الآن', 'قادمة': 'يبدأ بعد', 'منتهية': 'منتهي' };
+  btns.forEach(b => b.onclick = () => { btns.forEach(x => x.className = x === b ? on : off); const f = map[b.textContent.trim()]; [...grid.children].forEach(c => c.style.display = (!f || c.textContent.includes(f)) ? '' : 'none'); });
+}
+async function viewMore() {
+  await loadMeCtx();
+  let stage = null; try { if (me.stage_id) stage = (await q('stages', 'select=name&id=eq.' + me.stage_id))[0]; } catch (e) { }
+  let h = PG.more.replace('>تجريبي<', '>' + esc(me.full_name) + '<').replace(/mohamedkamalapi\+wardport@gmail\.com|mohamedkamalapi@gmail\.com/, esc(me.email || ''));
+  h = h.replace('>متربٍّ<', '>' + (isStaff() ? 'شيخ' : (CATEGORY[me.category] || 'متربٍّ')) + '<').replace('>بدون حلقة<', '>' + esc(me.group_name || 'بدون حلقة') + '<');
+  h = h.replace(/١٧ جمادى الآخرة ١٤٤٨ هـ/, fH.format(new Date(me.created_at || Date.now())));
+  const mi = h.indexOf('المشرف'); if (mi > 0) { const j = h.indexOf('>—<', mi); if (j > 0) h = h.slice(0, j) + '>' + esc(me.sheikh_name || '—') + '<' + h.slice(j + 3); }
+  h = h.replace('لم تُحدد بعد', stage ? esc(stage.name) : 'لم تُحدد بعد');
+  if (isStaff()) { const p = h.indexOf('href="#/ward"'), g = h.lastIndexOf('<div class="grid', p); h = h.slice(0, g) + `<a class="animate-rise group flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-secondary-200 bg-secondary-50 px-4 py-3.5 transition-colors duration-smooth hover:bg-secondary-100" href="#/sheikh"><div class="flex items-center gap-3"><span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary-700 text-accent-200"><i class="ri-shield-user-line text-base"></i></span><div><p class="text-[13px] font-semibold text-foreground-950">مساحة الشيخ</p><p class="text-[11px] text-foreground-500">متابعة الأعضاء واعتماد الترقيات</p></div></div><i class="ri-arrow-left-s-line text-lg text-foreground-400"></i></a>` + h.slice(g); }
+  draw(h);
+  [...$app.querySelectorAll('main button')].filter(b => b.textContent.includes('تسجيل الخروج')).forEach(b => b.onclick = logout);
+}
+async function viewInstall() { await loadMeCtx(); draw(PG.install); }
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); window._bip = e; });
 
 /* calendar (member or sheikh viewing a member) */
 async function calendarHtml(uid, y, m, sel) {
@@ -290,32 +443,12 @@ async function renderCal(host, uid, st, onSel) {
     host.querySelector('#dd').innerHTML = `<div class="card"><b>${n2a(+st.sel.slice(8))} ${MONTHS[+st.sel.slice(5, 7) - 1]}</b><div class="muted small">${n2a(ids.length)} من ${n2a(acts.length)} مكتمل</div>${acts.map(a => `<div class="small" style="margin-top:4px">${ids.includes(a.id) ? '✅' : '▫️'} ${esc(a.title)}</div>`).join('')}</div>`;
   });
 }
-async function viewHistory() {
-  $app.innerHTML = `<div class="page"><header class="top"><div><h1>المتابعة اليومية</h1><small>سجل التزامك بالشهر</small></div><div class="logo">ورد</div></header><div class="card" id="cal"></div></div>${tabs('/ward/history')}`;
-  const n = new Date(); await renderCal(document.getElementById('cal'), me.id, { y: n.getFullYear(), m: n.getMonth(), sel: null });
-}
-
-async function viewMore() {
-  let stage = null, group = null;
-  try { if (me.stage_id) stage = (await q('stages', 'select=name&id=eq.' + me.stage_id))[0]; if (me.group_id) group = (await q('tarbiyah_groups', 'select=*&id=eq.' + me.group_id))[0]; } catch (e) { }
-  const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
-  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  $app.innerHTML = `<div class="page"><header class="top"><div><h1>المزيد</h1><small>${esc(me.email)}</small></div><div class="logo">ورد</div></header>
-<div class="card"><h3>${esc(me.full_name)}</h3><div class="muted">${isStaff() ? 'شيخ' : CATEGORY[me.category]}${stage ? ' · ' + esc(stage.name) : ''}</div>${group ? `<hr><b>${esc(group.name)}</b><div class="muted small">${esc(group.sheikh_name || '')}</div><div class="muted small">${esc(group.meeting_note || '')}</div>` : ''}</div>
-${isStaff() ? '<a class="btn sec block" style="margin-bottom:12px" href="#/sheikh">مساحة الشيخ</a>' : ''}
-<div class="card"><h3>📲 تثبيت التطبيق على الموبايل</h3>${standalone ? '<p class="muted">التطبيق مثبّت بالفعل ✅</p>' : `<div id="ins"></div><p class="muted small">${ios ? 'على الآيفون: افتح الموقع في Safari، اضغط زر المشاركة ثم «إضافة إلى الشاشة الرئيسية».' : 'على الأندرويد: من قائمة المتصفح (⋮) اختر «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».'}</p>`}</div>
-<button class="btn red block" id="lo">تسجيل الخروج</button></div>${tabs('/more')}`;
-  document.getElementById('lo').onclick = logout;
-  if (window._bip && document.getElementById('ins')) { const b = document.getElementById('ins'); b.innerHTML = '<button class="btn block" style="margin-bottom:10px" id="bi">تثبيت الآن</button>'; document.getElementById('bi').onclick = () => { window._bip.prompt(); }; }
-}
-window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); window._bip = e; });
-
 /* ---------- sheikh views ---------- */
 function sheikhTabs(a) {
   const l = [['/sheikh', 'الرئيسية'], ['/sheikh/members', 'الأعضاء'], ['/sheikh/requests', 'الطلبات'], ['/sheikh/promotions', 'الترقيات'], ['/sheikh/wird', 'الأوراد']];
   return '<div class="chips">' + l.map(([p, t]) => `<a class="chip ${a === p ? 'on' : ''}" href="#${p}" style="text-decoration:none;color:inherit">${t}</a>`).join('') + '</div>';
 }
-const sheikhPage = (a, title, body) => `<div class="page wide"><header class="top"><div><h1>${title}</h1><small>مساحة الشيخ</small></div><div class="logo">ورد</div></header>${sheikhTabs(a)}${body}</div>${tabs('/sheikh')}`;
+const sheikhPage = (a, title, body) => shell(`<div class="lg"><div class="page wide" style="padding:0"><header class="top"><div><h1>${title}</h1><small>مساحة الشيخ</small></div></header>${sheikhTabs(a)}${body}</div></div>`);
 
 async function viewSheikh() {
   const [members, reqs, acts, logs] = await Promise.all([
