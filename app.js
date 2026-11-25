@@ -757,7 +757,7 @@ ${members.length ? members.map(m => { const cur = byId[m.stage_id], next = cur ?
 }
 
 async function viewWirdMgmt(editId) {
-  const acts = await q('wird_activities', 'select=*&order=order_index.asc,created_at.asc');
+  const [acts, stg] = await Promise.all([q('wird_activities', 'select=*&order=order_index.asc,created_at.asc'), q('stages', 'select=id,name&order=order_index')]);
   const e = acts.find(a => a.id === editId) || { type: 'toggle', category: 'worship', is_active: true, order_index: acts.length + 1, quran_unit: 'juz', quran_parts: 1 };
   const tl = { toggle: 'زر (تم / تراجع)', counter: 'عدّاد', quran: 'قرآن (أجزاء)' };
   const on = acts.filter(a => a.is_active).length;
@@ -827,6 +827,7 @@ async function viewReports(st) {
     return `<table class="rp"><thead><tr><th>العضو</th>${list.map(a => `<th>${esc(a.title)}</th>`).join('')}</tr></thead><tbody>${members.map(m => `<tr><td class="dy">${esc(m.full_name)}</td>${list.map(a => { const n = dates.filter(d => done(m.id, a, d)).length; return `<td class="${n === dates.length ? 'ok' : n === 0 ? 'no' : ''}" style="${n && n < dates.length ? 'background:#fef9c3;color:#854d0e;font-weight:700' : ''}">${n2a(n)}/${n2a(dates.length)}</td>`; }).join('')}</tr>`).join('')}</tbody></table>`;
   };
   let rank = '';
+  if (!fajr) rank = `<section class="panel"><b style="font-size:14px"><i class="ri-trophy-line"></i> ترتيب صلاة الفجر</b><div class="mt">لا يوجد ورد باسم «صلاة الفجر» لتسجيله يوميًا. أضف وردًا بهذا الاسم من «الأوراد» ليظهر الترتيب هنا تلقائيًا من التسجيلات الفعلية.</div></section>`;
   if (fajr) {
     const r = members.map(m => ({ n: m.full_name, c: dates.filter(d => done(m.id, fajr, d)).length })).sort((a, b) => b.c - a.c || a.n.localeCompare(b.n, 'ar'));
     rank = `<section class="panel"><b style="font-size:14px"><i class="ri-trophy-line"></i> ترتيب صلاة الفجر</b><div class="mt">عدد الأيام التي أُدّيت فيها خلال آخر ${n2a(st.days)} يومًا</div>${r.map((x, i) => `<div class="rw" style="padding:8px 0;border-top:1px solid oklch(var(--background-200));margin-top:${i ? 0 : 8}px"><span style="font-size:13px"><b style="display:inline-block;width:22px;color:oklch(var(--primary-700))">${n2a(i + 1)}</b>${esc(x.n)}</span><span class="bd ${x.c ? '' : 'w'}">${n2a(x.c)} / ${n2a(dates.length)}</span></div>`).join('')}</section>`;
