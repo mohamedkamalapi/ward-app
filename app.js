@@ -155,6 +155,7 @@ async function render() {
       if (route === '/sheikh/members') return await viewMembers();
       if (route.startsWith('/sheikh/member/')) return await viewMember(route.split('/')[3]);
       if (route === '/sheikh/roster') return await viewSheikhRoster();
+      if (route === '/sheikh/reports') return await viewReports();
       if (route === '/sheikh/requests') return await viewRequests();
       if (route === '/sheikh/promotions') return await viewPromotions();
       if (route === '/sheikh/wird') return await viewWirdMgmt();
@@ -515,30 +516,12 @@ async function renderCal(host, uid, st, onSel) {
   });
 }
 /* ---------- sheikh views ---------- */
-function sheikhTabs(a) {
+function sheikhTabs_old(a) {
   const l = [['/sheikh', 'الرئيسية'], ['/sheikh/members', 'الأعضاء'], ['/sheikh/roster', 'المجموعات'], ['/sheikh/requests', 'الطلبات'], ['/sheikh/promotions', 'الترقيات'], ['/sheikh/wird', 'الأوراد']];
   return '<div class="chips">' + l.map(([p, t]) => `<a class="chip ${a === p ? 'on' : ''}" href="#${p}" style="text-decoration:none;color:inherit">${t}</a>`).join('') + '</div>';
 }
-const SP_CSS = `<style>
-.sp{font-family:var(--font-body);padding-bottom:20px}.sp *{box-sizing:border-box}
-.sp header.sh h1{font-family:var(--font-heading);font-size:18px;font-weight:700;margin:0;color:oklch(var(--primary-900))}.sp header.sh small{font-size:12px;opacity:.65}
-.sp .chips{display:flex;gap:8px;overflow-x:auto;padding:12px 0;scrollbar-width:none}.sp .chip{flex:none;padding:7px 14px;border-radius:99px;border:1px solid oklch(var(--background-300));background:oklch(var(--background-50));font-size:13px;white-space:nowrap}
-.sp .chip.on{background:oklch(var(--primary-800));color:#fff!important;border-color:transparent}
-.sp .card,.sp form.card{display:block;background:oklch(var(--background-50));border:1px solid oklch(var(--background-300));border-radius:14px;padding:14px;margin-bottom:10px}
-.sp .row{display:flex;align-items:center;gap:8px}.sp .sp,.sp .row.sp{justify-content:space-between}
-.sp .muted{opacity:.68}.sp .small{font-size:12px}.sp .center{text-align:center}.sp h3{font-size:15px;margin:14px 0 8px}
-.sp .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}.sp .stat{background:oklch(var(--background-50));border:1px solid oklch(var(--background-300));border-radius:14px;padding:14px;font-size:12px;opacity:1}
-.sp .stat b{display:block;font-size:24px;font-family:var(--font-heading);color:oklch(var(--primary-700));margin-bottom:2px}
-.sp .pill{font-size:11px;padding:2px 9px;border-radius:99px;background:oklch(var(--primary-100));color:oklch(var(--primary-800))}
-.sp .btn{display:inline-block;padding:10px 16px;border:0;border-radius:11px;background:oklch(var(--primary-700));color:#fff;font:inherit;font-weight:700;font-size:14px;cursor:pointer;text-decoration:none}
-.sp .btn.sec{background:transparent;color:oklch(var(--primary-800));border:1px solid oklch(var(--primary-300))}.sp .btn.sm{padding:8px 12px;font-size:13px}.sp .btn.block{display:block;width:100%;text-align:center}
-.sp label{display:block;font-size:12px;font-weight:600;margin:10px 0 4px}
-.sp input,.sp select,.sp textarea{width:100%;font:inherit;font-size:14px;padding:10px 11px;border-radius:11px;border:1px solid oklch(var(--background-300));background:#fff}
-.sp .err{color:#b91c1c;font-size:13px}
-</style>`;
-const sheikhPage = (a, title, body) => shell(`${SP_CSS}<div class="sp"><header class="sh"><h1>${title}</h1><small>مساحة الشيخ</small></header>${sheikhTabs(a)}${body}</div>`);
 
-async function viewSheikh() {
+async function viewSheikh_old() {
   const [members, reqs, acts, logs] = await Promise.all([
     q('profiles', 'select=id,full_name,last_active_at,group_id,stage_id&role=eq.member&status=eq.active'),
     q('membership_requests', 'select=id&status=eq.pending'), loadActivities(), q('wird_logs', `select=member_id,completed&log_date=eq.${today()}&completed=eq.true`)]);
@@ -547,13 +530,13 @@ async function viewSheikh() {
   $app.innerHTML = sheikhPage('/sheikh', 'لوحة الشيخ', `<div class="stats"><div class="stat"><b>${n2a(members.length)}</b>أعضاء نشطون</div><div class="stat"><b>${n2a(reqs.length)}</b>طلبات معلّقة</div><div class="stat"><b>${n2a(logged)}</b>سجّلوا اليوم</div><div class="stat"><b>${n2a(full)}</b>أكملوا الورد كاملًا</div></div>
 <div class="card"><h3>التزام اليوم</h3>${members.length ? members.map(m => `<a class="row sp" style="padding:8px 0;text-decoration:none;color:inherit" href="#/sheikh/member/${m.id}"><span>${esc(m.full_name)}</span><span class="pill ${per[m.id] ? '' : 'w'}">${n2a(per[m.id] || 0)} / ${n2a(acts.length)}</span></a>`).join('') : '<p class="muted">لا يوجد أعضاء مفعّلون بعد.</p>'}</div>`);
 }
-async function viewMembers() {
+async function viewMembers_old() {
   const [members, groups, stages] = await Promise.all([q('profiles', 'select=*&role=eq.member&order=created_at.desc'), q('tarbiyah_groups', 'select=id,name'), q('stages', 'select=id,name')]);
   const gn = id => (groups.find(g => g.id === id) || {}).name || '—', sn = id => (stages.find(s => s.id === id) || {}).name || '—';
   const stp = { active: ['نشط', ''], pending: ['معلّق', 'w'], suspended: ['موقوف', 'r'], archived: ['مؤرشف', 'r'] };
   $app.innerHTML = sheikhPage('/sheikh/members', 'الأعضاء', members.length ? members.map(m => `<a class="card" style="display:block;text-decoration:none;color:inherit" href="#/sheikh/member/${m.id}"><div class="row sp"><b>${esc(m.full_name)}</b><span class="pill ${stp[m.status][1]}">${stp[m.status][0]}</span></div><div class="muted small">${CATEGORY[m.category]} · ${esc(gn(m.group_id))} · ${esc(sn(m.stage_id))}</div><div class="muted small">آخر نشاط: ${m.last_active_at ? new Date(m.last_active_at).toLocaleDateString('ar-EG') : '—'}</div></a>`).join('') : '<div class="card muted center">لا يوجد أعضاء.</div>');
 }
-async function viewMember(id) {
+async function viewMember_old(id) {
   const [p, notes] = await Promise.all([q('profiles', 'select=*&id=eq.' + id), q('member_notes', `select=*&member_id=eq.${id}&order=created_at.desc`)]);
   const m = p[0]; if (!m) return go('/sheikh/members');
   $app.innerHTML = sheikhPage('/sheikh/members', esc(m.full_name), `<div class="card"><div class="muted">${esc(m.email)} · ${CATEGORY[m.category]}</div></div><div class="card" id="cal"></div>
@@ -561,7 +544,7 @@ async function viewMember(id) {
   const n = new Date(); renderCal(document.getElementById('cal'), id, { y: n.getFullYear(), m: n.getMonth(), sel: null });
   document.getElementById('nf').onsubmit = async ev => { ev.preventDefault(); try { await ins('member_notes', { tenant_id: TENANT, member_id: id, author_id: me.id, author_name: me.full_name, body: new FormData(ev.target).get('b').trim() }); toast('تمت الإضافة'); viewMember(id); } catch (e) { toast(errAr(e)); } };
 }
-async function viewRequests() {
+async function viewRequests_old() {
   const reqs = await q('membership_requests', 'select=*&order=created_at.desc&limit=60');
   const pend = reqs.filter(r => r.status === 'pending'), rest = reqs.filter(r => r.status !== 'pending');
   const card = (r, act) => `<div class="card"><div class="row sp"><b>${esc(r.full_name)}</b><span class="pill ${r.status === 'pending' ? 'w' : r.status === 'approved' ? '' : 'r'}">${{ pending: 'معلّق', approved: 'مقبول', rejected: 'مرفوض' }[r.status]}</span></div><div class="muted small" dir="ltr" style="text-align:right">${esc(r.email)}</div><div class="muted small">${CATEGORY[r.category]} · ${esc(r.group_name || 'بدون حلقة')}</div>${r.note ? `<div class="small">${esc(r.note)}</div>` : ''}${act ? `<div class="row" style="margin-top:10px"><button class="btn sm grow" data-ok="${r.id}">قبول</button><button class="btn red sm grow" data-no="${r.id}">رفض</button></div>` : ''}</div>`;
@@ -580,7 +563,7 @@ async function viewRequests() {
   $app.querySelectorAll('[data-ok]').forEach(b => b.onclick = () => act(b.dataset.ok, true));
   $app.querySelectorAll('[data-no]').forEach(b => b.onclick = () => act(b.dataset.no, false));
 }
-async function viewPromotions() {
+async function viewPromotions_old() {
   const [members, stages, promos] = await Promise.all([q('profiles', 'select=id,full_name,stage_id&role=eq.member&status=eq.active'), q('stages', 'select=*&order=order_index'), q('promotions', 'select=*&order=created_at.desc&limit=30')]);
   const byId = Object.fromEntries(stages.map(s => [s.id, s])), mById = Object.fromEntries(members.map(m => [m.id, m]));
   $app.innerHTML = sheikhPage('/sheikh/promotions', 'الترقيات', `${members.length ? members.map(m => { const cur = byId[m.stage_id], next = cur ? stages.find(s => s.order_index > cur.order_index) : null; return `<div class="card"><div class="row sp"><b>${esc(m.full_name)}</b><span class="pill">${esc(cur ? cur.name : 'بدون مرحلة')}</span></div>${cur ? (next ? `<button class="btn sm block" style="margin-top:10px" data-p="${m.id}" data-to="${next.id}">اعتماد الترقية إلى «${esc(next.name)}»</button>` : '<div class="muted small">أعلى مرحلة</div>') : `<button class="btn sec sm block" style="margin-top:10px" data-s="${m.id}">بدء المرحلة الأولى</button>`}</div>`; }).join('') : '<div class="card muted center">لا يوجد أعضاء نشطون.</div>'}
@@ -588,7 +571,7 @@ async function viewPromotions() {
   $app.querySelectorAll('[data-p]').forEach(b => b.onclick = async () => { try { await rpc('approve_stage_promotion', { p_member_id: b.dataset.p, p_to_stage_id: b.dataset.to }); toast('تمت الترقية'); viewPromotions(); } catch (e) { toast(errAr(e)); } });
   $app.querySelectorAll('[data-s]').forEach(b => b.onclick = async () => { try { await rpc('start_member_stage', { p_member_id: b.dataset.s }); toast('تم'); viewPromotions(); } catch (e) { toast(errAr(e)); } });
 }
-async function viewWirdMgmt(editId) {
+async function viewWirdMgmt_old(editId) {
   const acts = await q('wird_activities', 'select=*&order=order_index.asc,created_at.asc');
   const e = acts.find(a => a.id === editId) || { type: 'toggle', category: 'worship', is_active: true, order_index: acts.length + 1, quran_unit: 'juz', quran_parts: 1 };
   const tl = { toggle: 'زر (تم / تراجع)', counter: 'عدّاد', quran: 'قرآن (أجزاء)' };
@@ -665,4 +648,240 @@ function viewNewPassword() {
     ev.preventDefault(); const e = document.getElementById('e');
     try { await api('/auth/v1/user', { method: 'PUT', body: { password: new FormData(ev.target).get('p') } }); window.__recovery = false; toast('تم تغيير كلمة المرور'); go('/'); render(); } catch (er) { e.textContent = errAr(er); }
   };
+}
+
+/* ---------- sheikh area, Readdy layout ---------- */
+const SP_CSS = `<style>
+.sp{font-family:var(--font-body);padding-bottom:24px;color:oklch(var(--foreground-900))}.sp *{box-sizing:border-box}
+.sp .hd{display:flex;flex-direction:column;gap:10px}.sp .hd h1{font-family:var(--font-heading);font-size:20px;font-weight:600;margin:0;color:oklch(var(--foreground-950))}
+.sp .hd p{font-size:12px;margin:4px 0 0;color:oklch(var(--foreground-500));line-height:1.7}
+.sp .btn0{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;white-space:nowrap;border-radius:6px;border:1px solid oklch(var(--background-300));background:oklch(var(--background-50));padding:6px 12px;font:inherit;font-size:11.5px;color:oklch(var(--foreground-700));cursor:pointer}
+.sp .btn1{display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;border-radius:6px;border:0;background:oklch(var(--primary-700));padding:8px 14px;font:inherit;font-size:11.5px;font-weight:500;color:#fff;cursor:pointer;text-decoration:none}
+.sp .btn1.red{background:#b91c1c}.sp .btn1.sec{background:transparent;color:oklch(var(--primary-800));border:1px solid oklch(var(--primary-300))}
+.sp .chips{display:flex;gap:8px;overflow-x:auto;padding:12px 0 2px;scrollbar-width:none}.sp .chips::-webkit-scrollbar{display:none}
+.sp .chip{flex:none;padding:6px 13px;border-radius:99px;border:1px solid oklch(var(--background-300));background:oklch(var(--background-50));font-size:12px;white-space:nowrap;text-decoration:none;color:oklch(var(--foreground-700))}
+.sp .chip.on{background:oklch(var(--primary-800));color:#fff;border-color:transparent}
+.sp .tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+.sp .tile{border-radius:12px;border:1px solid oklch(var(--background-200));background:oklch(var(--background-50));padding:14px}
+.sp .ti{display:flex;width:32px;height:32px;align-items:center;justify-content:center;border-radius:6px;background:oklch(var(--primary-100));color:oklch(var(--primary-700));font-size:14px}
+.sp .ti.a{background:oklch(var(--accent-100));color:oklch(var(--accent-900))}.sp .ti.b{background:oklch(var(--secondary-100));color:oklch(var(--secondary-900))}
+.sp .tile b{display:block;margin-top:8px;font-size:20px;font-weight:600;line-height:1;color:oklch(var(--foreground-950))}.sp .tile span.l{display:block;margin-top:6px;font-size:10.5px;color:oklch(var(--foreground-500))}
+.sp .panel{margin-top:16px;border-radius:12px;border:1px solid oklch(var(--background-200));background:oklch(var(--background-50));padding:14px}
+.sp .it{width:100%;border-radius:6px;border:1px solid oklch(var(--background-300));background:oklch(var(--background-50));padding:9px 12px;font:inherit;font-size:12px;color:oklch(var(--foreground-900))}
+.sp .it:focus{outline:1px solid oklch(var(--primary-300));border-color:oklch(var(--primary-400))}
+.sp .pills{display:flex;gap:6px;overflow-x:auto;margin-top:10px;scrollbar-width:none}
+.sp .pl{flex:none;display:flex;align-items:center;gap:6px;border-radius:99px;border:1px solid oklch(var(--background-300));background:oklch(var(--background-50));padding:6px 12px;font:inherit;font-size:11px;color:oklch(var(--foreground-600));cursor:pointer}
+.sp .pl.on{background:oklch(var(--primary-700));border-color:oklch(var(--primary-700));color:#fff}
+.sp .cnt{margin:12px 0 0;font-size:11px;color:oklch(var(--foreground-500))}
+.sp .cd{display:block;margin-top:10px;border-radius:12px;border:1px solid oklch(var(--background-200));background:oklch(var(--background-50));padding:14px;text-decoration:none;color:inherit}
+.sp .rw{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.sp .av{display:flex;flex:none;width:38px;height:38px;align-items:center;justify-content:center;border-radius:99px;background:oklch(var(--primary-100));color:oklch(var(--primary-800));font-family:var(--font-heading);font-weight:600;font-size:14px}
+.sp .nm{font-size:13.5px;font-weight:600;color:oklch(var(--foreground-950))}.sp .mt{font-size:11px;color:oklch(var(--foreground-500));margin-top:2px}
+.sp .bd{display:inline-block;border-radius:99px;padding:2px 9px;font-size:10.5px;background:oklch(var(--primary-100));color:oklch(var(--primary-800))}.sp .bd.w{background:oklch(var(--accent-100));color:oklch(var(--accent-900))}.sp .bd.r{background:#fee2e2;color:#991b1b}
+.sp .em{margin-top:10px;border-radius:12px;border:1px dashed oklch(var(--background-300));background:oklch(var(--background-50));padding:30px 16px;text-align:center}
+.sp .em i{display:flex;margin:0 auto;width:44px;height:44px;align-items:center;justify-content:center;border-radius:99px;background:oklch(var(--background-100));color:oklch(var(--foreground-500));font-size:18px}
+.sp .em p{margin:10px 0 0;font-size:12.5px;font-weight:500}.sp .em small{display:block;margin-top:4px;font-size:11px;color:oklch(var(--foreground-500))}
+.sp label{display:block;font-size:11.5px;font-weight:600;margin:12px 0 5px}.sp .err{color:#b91c1c;font-size:12px;margin-top:8px}
+.sp h3{font-size:14px;font-family:var(--font-heading);margin:18px 0 0}
+.sp .tw{overflow-x:auto;margin-top:12px;border-radius:12px;border:1px solid oklch(var(--background-200))}
+.sp table.rp{border-collapse:collapse;width:100%;font-size:11.5px;background:#fff}
+.sp table.rp th{background:oklch(var(--primary-800));color:#fff;padding:8px 6px;font-weight:600;white-space:nowrap;border:1px solid oklch(var(--primary-900))}
+.sp table.rp td{padding:7px 6px;text-align:center;border:1px solid oklch(var(--background-200))}
+.sp table.rp td.dy{background:oklch(var(--background-100));font-weight:600;white-space:nowrap}
+.sp td.ok{background:#dcfce7;color:#166534;font-weight:700}.sp td.no{background:#fee2e2;color:#991b1b;font-weight:700}.sp td.na{color:#94a3b8}
+</style>`;
+function sheikhTabs(a) {
+  const l = [['/sheikh', 'الرئيسية'], ['/sheikh/reports', 'التقارير'], ['/sheikh/members', 'الأعضاء'], ['/sheikh/roster', 'المجموعات'], ['/sheikh/requests', 'الطلبات'], ['/sheikh/promotions', 'الترقيات'], ['/sheikh/wird', 'الأوراد']];
+  return '<div class="chips">' + l.map(([p, t]) => `<a class="chip ${a === p ? 'on' : ''}" href="#${p}">${p === '/sheikh/reports' ? '<i class="ri-file-chart-line" style="margin-left:4px"></i>' : ''}${t}</a>`).join('') + '</div>';
+}
+const sheikhPage = (a, title, body, sub, extra) => shell(`${SP_CSS}<div class="sp"><header class="hd"><div><h1>${title}</h1><p>${sub || 'مساحة الشيخ'}</p></div>${extra === undefined ? '<button class="btn0" id="rfb"><i class="ri-refresh-line"></i>تحديث</button>' : extra}</header>${sheikhTabs(a)}${body}</div>`);
+const bindRefresh = fn => { const b = document.getElementById('rfb'); if (b) b.onclick = () => fn(); };
+const emptyBox = (ic, t, s) => `<div class="em"><i class="${ic}"></i><p>${t}</p><small>${s || ''}</small></div>`;
+const tile = (ic, cls, n, l) => `<div class="tile"><span class="ti ${cls}"><i class="${ic}"></i></span><b>${n2a(n)}</b><span class="l">${l}</span></div>`;
+const ini = n => (String(n || '؟').trim()[0] || '؟');
+
+async function viewMembers() {
+  const [members, groups, stages] = await Promise.all([q('profiles', 'select=*&role=eq.member&order=created_at.desc'), q('tarbiyah_groups', 'select=id,name'), q('stages', 'select=id,name&order=order_index')]);
+  const gn = id => (groups.find(g => g.id === id) || {}).name || '—', sn = id => (stages.find(s => s.id === id) || {}).name || '—';
+  const stp = { active: ['نشط', ''], pending: ['معلّق', 'w'], suspended: ['موقوف', 'r'], archived: ['مؤرشف', 'r'] };
+  let fq = '', fs = 'all', fl = 'all';
+  const week = Date.now() - 7 * 864e5;
+  const paint = () => {
+    const list = members.filter(m => (!fq || (m.full_name + ' ' + (m.email || '')).toLowerCase().includes(fq)) && (fs === 'all' || m.stage_id === fs) && (fl === 'all' || (fl === 'follow' && (!m.last_active_at || new Date(m.last_active_at) < week)) || (fl === 'pending' && m.status === 'pending')));
+    document.getElementById('cnt').innerHTML = `عرض <b>${n2a(list.length)}</b> من أصل <b>${n2a(members.length)}</b> عضو`;
+    document.getElementById('lst').innerHTML = list.length ? list.map(m => { const st = stp[m.status] || ['—', '']; return `<a class="cd" href="#/sheikh/member/${m.id}"><div class="rw"><div class="rw" style="justify-content:flex-start;gap:10px"><span class="av">${esc(ini(m.full_name))}</span><div><div class="nm">${esc(m.full_name)}</div><div class="mt">${CATEGORY[m.category] || ''} · ${esc(gn(m.group_id))}</div></div></div><span class="bd ${st[1]}">${st[0]}</span></div><div class="rw" style="margin-top:10px;font-size:11px;color:oklch(var(--foreground-500))"><span><i class="ri-medal-line"></i> ${esc(sn(m.stage_id))}</span><span>آخر نشاط: ${m.last_active_at ? new Date(m.last_active_at).toLocaleDateString('ar-EG') : '—'}</span></div></a>`; }).join('') : emptyBox('ri-team-line', 'لا يوجد أعضاء مطابقون', 'جرّب تعديل البحث أو اختيار مرحلة أخرى.');
+    document.querySelectorAll('[data-fl]').forEach(b => b.classList.toggle('on', b.dataset.fl === fl));
+  };
+  $app.innerHTML = sheikhPage('/sheikh/members', 'أعضاء الحلقة', `<section class="panel" style="margin-top:14px"><div style="position:relative"><i class="ri-search-line" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:14px;opacity:.5"></i><input class="it" id="sq" type="search" placeholder="ابحث بالاسم أو البريد…" style="padding-right:36px"></div><select class="it" id="ss" style="margin-top:10px"><option value="all">كل المراحل</option>${stages.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select><div class="pills"><button class="pl on" data-fl="all"><i class="ri-team-line"></i>كل الأعضاء</button><button class="pl" data-fl="follow"><i class="ri-alarm-warning-line"></i>يحتاجون متابعة</button><button class="pl" data-fl="pending"><i class="ri-time-line"></i>بانتظار الاعتماد</button></div></section><p class="cnt" id="cnt"></p><div id="lst"></div>`, 'تابع مدة كل عضو في مرحلته، وآخر نشاط له، وملاحظات المتابعة التربوية.');
+  document.getElementById('sq').oninput = e => { fq = e.target.value.trim().toLowerCase(); paint(); };
+  document.getElementById('ss').onchange = e => { fs = e.target.value; paint(); };
+  document.querySelectorAll('[data-fl]').forEach(b => b.onclick = () => { fl = b.dataset.fl; paint(); });
+  bindRefresh(viewMembers); paint();
+}
+
+async function viewRequests() {
+  const reqs = await q('membership_requests', 'select=*&order=created_at.desc&limit=60');
+  const pend = reqs.filter(r => r.status === 'pending'), rest = reqs.filter(r => r.status !== 'pending');
+  const ap = reqs.filter(r => r.status === 'approved').length, rj = reqs.filter(r => r.status === 'rejected').length;
+  const card = (r, act) => `<div class="cd"><div class="rw"><div class="rw" style="justify-content:flex-start;gap:10px"><span class="av">${esc(ini(r.full_name))}</span><div><div class="nm">${esc(r.full_name)}</div><div class="mt" dir="ltr" style="text-align:right">${esc(r.email)}</div></div></div><span class="bd ${r.status === 'pending' ? 'w' : r.status === 'approved' ? '' : 'r'}">${{ pending: 'معلّق', approved: 'مقبول', rejected: 'مرفوض' }[r.status]}</span></div><div class="mt" style="margin-top:8px">${CATEGORY[r.category] || ''} · ${esc(r.group_name || 'بدون حلقة')}</div>${r.note ? `<div class="mt" style="margin-top:6px;color:inherit">${esc(r.note)}</div>` : ''}${act ? `<div class="rw" style="margin-top:12px;gap:8px"><button class="btn1" style="flex:1" data-ok="${r.id}"><i class="ri-check-line"></i>قبول</button><button class="btn1 red" style="flex:1" data-no="${r.id}"><i class="ri-close-line"></i>رفض</button></div>` : ''}</div>`;
+  $app.innerHTML = sheikhPage('/sheikh/requests', 'طلبات العضوية', `<section class="tiles">${tile('ri-time-line', 'a', pend.length, 'بانتظار المراجعة')}${tile('ri-user-follow-line', '', ap, 'طلبات معتمدة')}${tile('ri-close-circle-line', 'b', rj, 'طلبات مرفوضة')}${tile('ri-file-list-3-line', 'b', reqs.length, 'إجمالي الطلبات')}</section>${pend.length ? pend.map(r => card(r, true)).join('') : emptyBox('ri-checkbox-circle-line', 'لا توجد طلبات معلّقة', 'ستظهر هنا طلبات الانضمام الجديدة.')}${rest.length ? '<h3>الطلبات السابقة</h3>' + rest.map(r => card(r, false)).join('') : ''}`, 'راجع طلبات الانضمام واعتمدها لتفعيل حساب المتربّي في مرحلته التمهيدية.');
+  bindRefresh(viewRequests);
+  const act = async (id, ok) => {
+    const r = reqs.find(x => x.id === id);
+    try {
+      await upd('membership_requests', 'id=eq.' + id, { status: ok ? 'approved' : 'rejected', reviewed_by: me.id, reviewed_at: new Date().toISOString() });
+      if (r.user_id) {
+        if (ok) { await upd('profiles', 'id=eq.' + r.user_id, { status: 'active', sheikh_id: me.id, group_id: r.group_id }); await rpc('start_member_stage', { p_member_id: r.user_id }).catch(() => { }); }
+        else await upd('profiles', 'id=eq.' + r.user_id, { status: 'archived' });
+      }
+      toast(ok ? 'تم قبول العضو' : 'تم الرفض'); viewRequests();
+    } catch (e) { toast(errAr(e)); }
+  };
+  $app.querySelectorAll('[data-ok]').forEach(b => b.onclick = () => act(b.dataset.ok, true));
+  $app.querySelectorAll('[data-no]').forEach(b => b.onclick = () => act(b.dataset.no, false));
+}
+
+async function viewPromotions() {
+  const [members, stages, promos] = await Promise.all([q('profiles', 'select=id,full_name,stage_id&role=eq.member&status=eq.active'), q('stages', 'select=*&order=order_index'), q('promotions', 'select=*&order=created_at.desc&limit=30')]);
+  const byId = Object.fromEntries(stages.map(s => [s.id, s])), mById = Object.fromEntries(members.map(m => [m.id, m]));
+  const mon = new Date(); mon.setDate(1); mon.setHours(0, 0, 0, 0);
+  const thisMonth = promos.filter(p => new Date(p.created_at) >= mon).length;
+  const cand = members.filter(m => byId[m.stage_id] && stages.find(s => s.order_index > byId[m.stage_id].order_index)).length;
+  $app.innerHTML = sheikhPage('/sheikh/promotions', 'الترقيات والمراحل', `<section class="tiles">${tile('ri-arrow-up-double-line', 'a', cand, 'يمكن ترقيتهم')}${tile('ri-calendar-check-line', '', thisMonth, 'ترقيات هذا الشهر')}${tile('ri-history-line', 'b', promos.length, 'إجمالي الترقيات')}${tile('ri-team-line', 'b', members.length, 'أعضاء نشطون')}</section>
+${members.length ? members.map(m => { const cur = byId[m.stage_id], next = cur ? stages.find(s => s.order_index > cur.order_index) : null; return `<div class="cd"><div class="rw"><div class="rw" style="justify-content:flex-start;gap:10px"><span class="av">${esc(ini(m.full_name))}</span><div class="nm">${esc(m.full_name)}</div></div><span class="bd">${esc(cur ? cur.name : 'بدون مرحلة')}</span></div>${cur ? (next ? `<button class="btn1" style="width:100%;margin-top:12px" data-p="${m.id}" data-to="${next.id}"><i class="ri-arrow-up-double-line"></i>اعتماد الترقية إلى «${esc(next.name)}»</button>` : '<div class="mt" style="margin-top:10px">أعلى مرحلة</div>') : `<button class="btn1 sec" style="width:100%;margin-top:12px" data-s="${m.id}">بدء المرحلة الأولى</button>`}</div>`; }).join('') : emptyBox('ri-arrow-up-double-line', 'لا يوجد أعضاء نشطون', 'تظهر الترقيات بعد تفعيل الأعضاء.')}
+<h3>سجل الترقيات</h3>${promos.length ? promos.map(p => `<div class="cd" style="font-size:12px">${esc((mById[p.member_id] || {}).full_name || 'عضو')}: ${esc((byId[p.from_stage_id] || {}).name || '—')} ← ${esc((byId[p.to_stage_id] || {}).name || '—')}<div class="mt">${new Date(p.created_at).toLocaleDateString('ar-EG')}</div></div>`).join('') : emptyBox('ri-history-line', 'لا توجد ترقيات بعد', '')}`, 'راجع الأعضاء المستوفين لمدة مراحلهم، واعتمد انتقالهم بعد التثبّت من حالهم.');
+  bindRefresh(viewPromotions);
+  $app.querySelectorAll('[data-p]').forEach(b => b.onclick = async () => { try { await rpc('approve_stage_promotion', { p_member_id: b.dataset.p, p_to_stage_id: b.dataset.to }); toast('تمت الترقية'); viewPromotions(); } catch (e) { toast(errAr(e)); } });
+  $app.querySelectorAll('[data-s]').forEach(b => b.onclick = async () => { try { await rpc('start_member_stage', { p_member_id: b.dataset.s }); toast('تم'); viewPromotions(); } catch (e) { toast(errAr(e)); } });
+}
+
+async function viewWirdMgmt(editId) {
+  const acts = await q('wird_activities', 'select=*&order=order_index.asc,created_at.asc');
+  const e = acts.find(a => a.id === editId) || { type: 'toggle', category: 'worship', is_active: true, order_index: acts.length + 1, quran_unit: 'juz', quran_parts: 1 };
+  const tl = { toggle: 'زر (تم / تراجع)', counter: 'عدّاد', quran: 'قرآن (أجزاء)' };
+  const on = acts.filter(a => a.is_active).length;
+  $app.innerHTML = sheikhPage('/sheikh/wird', 'إدارة أوراد الحلقة', `<section class="tiles">${tile('ri-list-check-2', '', acts.length, 'إجمالي الأوراد')}${tile('ri-checkbox-circle-line', '', on, 'المفعّلة اليوم')}${tile('ri-pause-circle-line', 'a', acts.length - on, 'المعطّلة')}${tile('ri-book-open-line', 'b', acts.filter(a => a.type === 'quran').length, 'أوراد قرآن')}</section>
+<form class="panel" id="f"><h3 style="margin:0">${editId ? 'تعديل ورد' : 'إضافة ورد'}</h3>
+<label>العنوان</label><input class="it" name="title" required value="${esc(e.title || '')}"><label>الوصف</label><input class="it" name="description" value="${esc(e.description || '')}">
+<label>نوع التسجيل</label><select class="it" name="type" id="ty">${Object.entries(tl).map(([k, v]) => `<option value="${k}" ${e.type === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
+<label>التصنيف</label><select class="it" name="category">${Object.entries(CATS).map(([k, v]) => `<option value="${k}" ${e.category === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
+<div id="cn"><label>الهدف (للعدّاد)</label><input class="it" name="target_count" type="number" min="1" value="${e.target_count || ''}"><label>الوحدة (مثال: مرة، ساعة)</label><input class="it" name="target_unit" value="${esc(e.target_unit || '')}"></div>
+<div id="qn"><label>وحدة القرآن</label><select class="it" name="quran_unit"><option value="juz" ${e.quran_unit === 'juz' ? 'selected' : ''}>جزء</option><option value="pages" ${e.quran_unit === 'pages' ? 'selected' : ''}>صفحة</option></select><label>العدد اليومي</label><input class="it" name="quran_parts" type="number" min="1" value="${e.quran_parts || 1}"></div>
+<label>الترتيب</label><input class="it" name="order_index" type="number" value="${e.order_index}"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="is_active" style="width:auto" ${e.is_active ? 'checked' : ''}> مفعّل</label>
+<div class="err" id="er"></div><div class="rw" style="margin-top:12px;gap:8px"><button class="btn1" style="flex:1"><i class="ri-add-line"></i>${editId ? 'حفظ' : 'إضافة ورد'}</button>${editId ? '<button type="button" class="btn0" id="cx">إلغاء</button>' : ''}</div></form>
+<h3>الأوراد الحالية</h3>${acts.length ? acts.map(a => `<div class="cd"><div class="rw"><div><div class="nm">${esc(a.title)}</div><div class="mt">${CATS[a.category]}${a.type === 'counter' ? ' · الهدف ' + n2a(a.target_count || 0) + ' ' + esc(a.target_unit || '') : ''}${a.type === 'quran' ? ' · ' + n2a(a.quran_parts) + (a.quran_unit === 'pages' ? ' صفحة' : ' جزء') : ''}</div></div><span class="bd ${a.is_active ? '' : 'w'}">${a.is_active ? tl[a.type] : 'معطّل'}</span></div><div class="rw" style="margin-top:10px;gap:8px;justify-content:flex-start"><button class="btn0" data-e="${a.id}"><i class="ri-edit-line"></i>تعديل</button><button class="btn0" style="color:#b91c1c;border-color:#fecaca" data-d="${a.id}"><i class="ri-delete-bin-line"></i>حذف</button></div></div>`).join('') : emptyBox('ri-list-check-2', 'لا توجد أوراد', 'أضف أول ورد من النموذج أعلاه.')}`, 'اعتمد الأوراد اليومية لأعضاء حلقتك: إتمام بسيط، عدّاد بهدف يومي، أو ورد قرآن بأجزاء منفصلة.');
+  bindRefresh(() => viewWirdMgmt());
+  const sync = () => { const t = document.getElementById('ty').value; document.getElementById('cn').hidden = t !== 'counter'; document.getElementById('qn').hidden = t !== 'quran'; }; document.getElementById('ty').onchange = sync; sync();
+  if (editId) document.getElementById('cx').onclick = () => viewWirdMgmt();
+  document.getElementById('f').onsubmit = async ev => {
+    ev.preventDefault(); const f = new FormData(ev.target), t = f.get('type');
+    const row = { title: f.get('title').trim(), description: f.get('description').trim() || null, type: t, category: f.get('category'), order_index: +f.get('order_index') || 0, is_active: f.get('is_active') === 'on', target_count: t === 'counter' ? (+f.get('target_count') || 1) : null, target_unit: t === 'counter' ? (f.get('target_unit').trim() || null) : null, quran_unit: t === 'quran' ? f.get('quran_unit') : null, quran_parts: t === 'quran' ? (+f.get('quran_parts') || 1) : null, updated_at: new Date().toISOString() };
+    try { if (editId) await upd('wird_activities', 'id=eq.' + editId, row); else await ins('wird_activities', { ...row, tenant_id: TENANT, icon: 'ri-checkbox-circle-line' }); toast('تم الحفظ'); viewWirdMgmt(); } catch (er) { document.getElementById('er').textContent = errAr(er); }
+  };
+  $app.querySelectorAll('[data-e]').forEach(b => b.onclick = () => { viewWirdMgmt(b.dataset.e); window.scrollTo(0, 0); });
+  $app.querySelectorAll('[data-d]').forEach(b => b.onclick = async () => { if (!confirm('حذف النشاط وكل تسجيلاته؟ يمكنك تعطيله بدل الحذف.')) return; try { await del('wird_activities', 'id=eq.' + b.dataset.d); toast('تم الحذف'); viewWirdMgmt(); } catch (er) { toast(errAr(er)); } });
+}
+
+async function viewSheikh() {
+  const [members, reqs, acts, logs] = await Promise.all([
+    q('profiles', 'select=id,full_name,last_active_at,group_id,stage_id&role=eq.member&status=eq.active'),
+    q('membership_requests', 'select=id&status=eq.pending'), loadActivities(), q('wird_logs', `select=member_id,completed&log_date=eq.${today()}&completed=eq.true`)]);
+  const per = {}; logs.forEach(l => per[l.member_id] = (per[l.member_id] || 0) + 1);
+  const logged = members.filter(m => per[m.id]).length, full = members.filter(m => acts.length && per[m.id] >= acts.length).length;
+  $app.innerHTML = sheikhPage('/sheikh', 'لوحة الشيخ', `<section class="tiles">${tile('ri-team-line', '', members.length, 'أعضاء نشطون')}${tile('ri-time-line', 'a', reqs.length, 'طلبات معلّقة')}${tile('ri-edit-line', 'b', logged, 'سجّلوا اليوم')}${tile('ri-checkbox-circle-line', '', full, 'أكملوا الورد كاملًا')}</section>
+<section class="panel"><b style="font-size:14px">التزام اليوم</b>${members.length ? members.map(m => `<a class="rw" style="padding:10px 0;border-top:1px solid oklch(var(--background-200));text-decoration:none;color:inherit;margin-top:6px" href="#/sheikh/member/${m.id}"><span style="font-size:13px">${esc(m.full_name)}</span><span class="bd ${per[m.id] ? '' : 'w'}">${n2a(per[m.id] || 0)} / ${n2a(acts.length)}</span></a>`).join('') : emptyBox('ri-team-line', 'لا يوجد أعضاء مفعّلون بعد', '')}</section>`, 'ملخص حلقتك اليوم.');
+  bindRefresh(viewSheikh);
+}
+async function viewMember(id) {
+  const [p, notes] = await Promise.all([q('profiles', 'select=*&id=eq.' + id), q('member_notes', `select=*&member_id=eq.${id}&order=created_at.desc`)]);
+  const m = p[0]; if (!m) return go('/sheikh/members');
+  $app.innerHTML = sheikhPage('/sheikh/members', esc(m.full_name), `<section class="panel"><div class="mt" style="margin:0">${esc(m.email)} · ${CATEGORY[m.category] || ''}</div></section><section class="panel"><div class="lg" id="cal"></div></section>
+<section class="panel"><b style="font-size:14px">ملاحظات الشيخ</b><form id="nf"><textarea class="it" name="b" rows="2" required placeholder="اكتب ملاحظة…" style="margin-top:10px"></textarea><button class="btn1" style="margin-top:8px">إضافة</button></form>${notes.map(n => `<div style="border-top:1px solid oklch(var(--background-200));margin-top:10px;padding-top:8px"><div style="font-size:12.5px">${esc(n.body)}</div><div class="mt">${esc(n.author_name || '')} · ${new Date(n.created_at).toLocaleDateString('ar-EG')}</div></div>`).join('')}</section>`, 'متابعة العضو', '');
+  const n = new Date(); renderCal(document.getElementById('cal'), id, { y: n.getFullYear(), m: n.getMonth(), sel: null });
+  document.getElementById('nf').onsubmit = async ev => { ev.preventDefault(); try { await ins('member_notes', { tenant_id: TENANT, member_id: id, author_id: me.id, author_name: me.full_name, body: new FormData(ev.target).get('b').trim() }); toast('تمت الإضافة'); viewMember(id); } catch (e) { toast(errAr(e)); } };
+}
+
+/* ---------- reports ---------- */
+const DAYN = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+async function viewReports(st) {
+  st = st || window.__rp || { mode: 'group', member: '', days: 14 }; window.__rp = st;
+  const [members, acts] = await Promise.all([q('profiles', 'select=id,full_name&role=eq.member&status=eq.active&order=full_name'), loadActivities()]);
+  const to = new Date(), from = new Date(); from.setDate(to.getDate() - st.days + 1);
+  const f = ymd(from), t = ymd(to);
+  const [logs, parts] = await Promise.all([q('wird_logs', `select=member_id,activity_id,log_date,completed,counter_value&log_date=gte.${f}&log_date=lte.${t}&limit=10000`), q('wird_part_logs', `select=member_id,activity_id,log_date,part_index&completed=eq.true&log_date=gte.${f}&log_date=lte.${t}&limit=10000`)]);
+  const dates = []; for (let i = 0; i < st.days; i++) { const d = new Date(to); d.setDate(to.getDate() - i); dates.push(ymd(d)); }
+  const done = (uid, a, date) => {
+    if (a.type === 'quran') return parts.filter(p => p.member_id === uid && p.activity_id === a.id && p.log_date === date).length >= (a.quran_parts || 1);
+    const l = logs.find(x => x.member_id === uid && x.activity_id === a.id && x.log_date === date);
+    if (!l) return false; return a.type === 'counter' ? l.counter_value >= (a.target_count || 1) : !!l.completed;
+  };
+  const main = acts.filter(a => a.category === 'obligations'), other = acts.filter(a => a.category !== 'obligations');
+  const fajr = acts.find(a => /الفجر/.test(a.title));
+  if (!st.member && members[0]) st.member = members[0].id;
+  const dn = ds => { const d = new Date(ds + 'T00:00:00'); return DAYN[d.getDay()] + ' ' + n2a(d.getDate()) + '/' + n2a(d.getMonth() + 1); };
+  const mark = ok => ok ? '<td class="ok">✓</td>' : '<td class="no">✗</td>';
+  const tableFor = list => {
+    if (!list.length) return '';
+    if (st.mode === 'member') return `<table class="rp"><thead><tr><th>اليوم</th>${list.map(a => `<th>${esc(a.title)}</th>`).join('')}</tr></thead><tbody>${dates.map(d => `<tr><td class="dy">${dn(d)}</td>${list.map(a => mark(done(st.member, a, d))).join('')}</tr>`).join('')}</tbody></table>`;
+    return `<table class="rp"><thead><tr><th>العضو</th>${list.map(a => `<th>${esc(a.title)}</th>`).join('')}</tr></thead><tbody>${members.map(m => `<tr><td class="dy">${esc(m.full_name)}</td>${list.map(a => { const n = dates.filter(d => done(m.id, a, d)).length; return `<td class="${n === dates.length ? 'ok' : n === 0 ? 'no' : ''}" style="${n && n < dates.length ? 'background:#fef9c3;color:#854d0e;font-weight:700' : ''}">${n2a(n)}/${n2a(dates.length)}</td>`; }).join('')}</tr>`).join('')}</tbody></table>`;
+  };
+  let rank = '';
+  if (fajr) {
+    const r = members.map(m => ({ n: m.full_name, c: dates.filter(d => done(m.id, fajr, d)).length })).sort((a, b) => b.c - a.c || a.n.localeCompare(b.n, 'ar'));
+    rank = `<section class="panel"><b style="font-size:14px"><i class="ri-trophy-line"></i> ترتيب صلاة الفجر</b><div class="mt">عدد الأيام التي أُدّيت فيها خلال آخر ${n2a(st.days)} يومًا</div>${r.map((x, i) => `<div class="rw" style="padding:8px 0;border-top:1px solid oklch(var(--background-200));margin-top:${i ? 0 : 8}px"><span style="font-size:13px"><b style="display:inline-block;width:22px;color:oklch(var(--primary-700))">${n2a(i + 1)}</b>${esc(x.n)}</span><span class="bd ${x.c ? '' : 'w'}">${n2a(x.c)} / ${n2a(dates.length)}</span></div>`).join('')}</section>`;
+  }
+  const who = st.mode === 'member' ? (members.find(m => m.id === st.member) || {}).full_name || '' : 'كل أعضاء الحلقة';
+  window.__rpData = { who, days: st.days, from: f, to: t, main, other, tableHtml: tableFor, rows: null };
+  $app.innerHTML = sheikhPage('/sheikh/reports', 'التقارير', `<section class="panel" style="margin-top:14px"><div class="pills" style="margin:0"><button class="pl ${st.mode === 'group' ? 'on' : ''}" data-m="group"><i class="ri-group-line"></i>الحلقة كلها</button><button class="pl ${st.mode === 'member' ? 'on' : ''}" data-m="member"><i class="ri-user-line"></i>عضو واحد</button></div>${st.mode === 'member' ? `<select class="it" id="rm" style="margin-top:10px">${members.map(m => `<option value="${m.id}" ${m.id === st.member ? 'selected' : ''}>${esc(m.full_name)}</option>`).join('')}</select>` : ''}<select class="it" id="rd" style="margin-top:10px">${[7, 14, 30].map(n => `<option value="${n}" ${st.days === n ? 'selected' : ''}>آخر ${n2a(n)} يومًا</option>`).join('')}</select><div class="rw" style="margin-top:12px;gap:8px"><button class="btn1" style="flex:1" id="xpdf"><i class="ri-file-pdf-2-line"></i>تصدير PDF</button><button class="btn1 sec" style="flex:1" id="xpng"><i class="ri-image-line"></i>تصدير صورة</button></div></section>
+${members.length ? `<h3>الفرائض والعبادات الأساسية</h3><div class="tw">${tableFor(main) || '<div class="em">لا توجد أوراد في هذا التصنيف.</div>'}</div>${rank}${other.length ? `<h3>باقي الأوراد</h3><div class="tw">${tableFor(other)}</div>` : ''}<section class="panel"><b style="font-size:14px">الورد الموسمي</b><div class="mt">لا يوجد ورد موسمي مسجّل بعد. يظهر هنا تلقائيًا عند تفعيل موسم.</div></section>` : emptyBox('ri-file-chart-line', 'لا يوجد أعضاء مفعّلون', 'تظهر التقارير بعد تفعيل الأعضاء وتسجيلهم.')}`, 'جدول تلقائي بعلامات ✓ و ✗ لما سجّله كل عضو في كل ورد. البيانات من التسجيلات الفعلية فقط.');
+  bindRefresh(() => viewReports(st));
+  document.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { st.mode = b.dataset.m; viewReports(st); });
+  const rm = document.getElementById('rm'); if (rm) rm.onchange = e => { st.member = e.target.value; viewReports(st); };
+  document.getElementById('rd').onchange = e => { st.days = +e.target.value; viewReports(st); };
+  document.getElementById('xpdf').onclick = () => exportPdf();
+  document.getElementById('xpng').onclick = () => exportPng();
+}
+function reportDoc() {
+  const R = window.__rpData, el = document.querySelectorAll('.sp .tw');
+  const title = `تقرير الورد، ${R.who}`;
+  const sub = `من ${R.from} إلى ${R.to}`;
+  return { title, sub, tables: [...el].map(e => e.innerHTML), heads: ['الفرائض والعبادات الأساسية', 'باقي الأوراد'] };
+}
+function exportPdf() {
+  const d = reportDoc();
+  const w = window.open('', '_blank'); if (!w) return toast('اسمح بالنوافذ المنبثقة');
+  w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${d.title}</title><style>@page{size:A4 landscape;margin:12mm}body{font-family:Tahoma,'Noto Naskh Arabic','Noto Sans Arabic',Arial,sans-serif;color:#0f2a1d}h1{font-size:20px;margin:0}p{margin:4px 0 14px;color:#555;font-size:12px}h2{font-size:14px;margin:16px 0 6px;color:#14532d}table{border-collapse:collapse;width:100%;font-size:11px}th{background:#14532d;color:#fff;padding:6px;border:1px solid #0f3d24}td{padding:5px;text-align:center;border:1px solid #cbd5c8}td.dy{background:#f1f5ef;font-weight:700}td.ok{background:#dcfce7;color:#166534;font-weight:700}td.no{background:#fee2e2;color:#991b1b;font-weight:700}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}</style></head><body><h1>مُتَرَبِّي · ${d.title}</h1><p>${d.sub}</p>${d.tables.map((t, i) => `<h2>${d.heads[i] || ''}</h2><table>${t.replace(/^<table class="rp">|<\/table>$/g, '')}</table>`).join('')}<script>setTimeout(function(){window.print()},400)<\/script></body></html>`);
+  w.document.close();
+}
+function exportPng() {
+  const d = reportDoc(), tabs = [...document.querySelectorAll('.sp .tw table.rp')];
+  const FONT = '"Noto Sans Arabic","Tajawal",Tahoma,Arial,sans-serif', cw = 96, rh = 34, fw = 120, pad = 24;
+  const maxc = Math.max(...tabs.map(t => t.rows[0].cells.length));
+  const W = pad * 2 + fw + (maxc - 1) * cw;
+  let H = pad + 70; tabs.forEach(t => H += 40 + t.rows.length * rh + 14); H += 40;
+  const cv = document.createElement('canvas'); cv.width = W * 2; cv.height = H * 2; const c = cv.getContext('2d'); c.scale(2, 2); c.direction = 'rtl'; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillStyle = '#fbf8ef'; c.fillRect(0, 0, W, H);
+  c.fillStyle = '#14532d'; c.fillRect(0, 0, W, 62); c.fillStyle = '#fff'; c.font = `700 20px ${FONT}`; c.textAlign = 'right'; c.fillText('مُتَرَبِّي · ' + d.title, W - pad, 24); c.font = `13px ${FONT}`; c.fillStyle = '#d8f3e3'; c.fillText(d.sub, W - pad, 46); c.textAlign = 'center';
+  let y = 78;
+  tabs.forEach((t, ti) => {
+    c.fillStyle = '#14532d'; c.font = `700 14px ${FONT}`; c.textAlign = 'right'; c.fillText(d.heads[ti] || '', W - pad, y + 10); c.textAlign = 'center'; y += 24;
+    [...t.rows].forEach((r, ri) => {
+      [...r.cells].forEach((cell, ci) => {
+        const w = ci === 0 ? fw : cw, x = W - pad - (ci === 0 ? fw : fw + ci * cw);
+        const cls = cell.className; let bg = '#fff', fg = '#0f2a1d';
+        if (ri === 0) { bg = '#14532d'; fg = '#fff'; } else if (ci === 0) bg = '#eef3ea'; else if (cls.includes('ok')) { bg = '#dcfce7'; fg = '#166534'; } else if (cls.includes('no')) { bg = '#fee2e2'; fg = '#991b1b'; } else if (cell.style.background) { bg = '#fef9c3'; fg = '#854d0e'; }
+        c.fillStyle = bg; c.fillRect(x, y, w, rh); c.strokeStyle = '#cfd8c9'; c.strokeRect(x, y, w, rh);
+        c.fillStyle = fg; c.font = `${ri === 0 || ci === 0 || cls ? '700 ' : ''}12px ${FONT}`; c.fillText(cell.textContent.trim(), x + w / 2, y + rh / 2, w - 8);
+      });
+      y += rh;
+    });
+    y += 16;
+  });
+  c.fillStyle = '#6b7a6f'; c.font = `11px ${FONT}`; c.fillText('أُنشئ تلقائيًا من تسجيلات الورد في مُتَرَبِّي', W / 2, H - 16);
+  const url = cv.toDataURL('image/png');
+  const o = document.createElement('div'); o.style.cssText = 'position:fixed;inset:0;z-index:99;background:rgba(0,0,0,.7);overflow:auto;padding:16px';
+  o.innerHTML = `<div style="background:#fff;border-radius:14px;padding:12px;max-width:560px;margin:0 auto"><img src="${url}" style="width:100%;border-radius:8px"><div style="display:flex;gap:8px;margin-top:10px"><a id="dl" download="تقرير-الورد.png" href="${url}" style="flex:1;text-align:center;background:#166534;color:#fff;padding:10px;border-radius:8px;text-decoration:none;font-size:13px">حفظ الصورة</a><button id="sh" style="flex:1;border:1px solid #166534;color:#166534;background:#fff;border-radius:8px;font:inherit;font-size:13px">مشاركة</button><button id="cl" style="border:1px solid #ccc;background:#fff;border-radius:8px;padding:0 14px">إغلاق</button></div></div>`;
+  document.body.appendChild(o);
+  o.querySelector('#cl').onclick = () => o.remove();
+  o.querySelector('#sh').onclick = async () => { try { const b = await (await fetch(url)).blob(), file = new File([b], 'report.png', { type: 'image/png' }); if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: d.title }); else toast('المشاركة غير مدعومة، استخدم حفظ الصورة'); } catch (e) { } };
 }
