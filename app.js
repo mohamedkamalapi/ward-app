@@ -145,13 +145,14 @@ async function render() {
     if (route === '/progress') return await viewStatic('progress');
     if (route === '/seasons') return await viewStatic('seasons');
     if (route.startsWith('/seasons/')) return await viewStatic('season');
-    if (route === '/group') return await viewStatic('group');
+    if (route === '/group') return await viewRosterGroup();
     if (route === '/install') return await viewInstall();
     if (route === '/reminders') return await viewReminders();
     if (isStaff()) {
       if (route === '/sheikh') return await viewSheikh();
       if (route === '/sheikh/members') return await viewMembers();
       if (route.startsWith('/sheikh/member/')) return await viewMember(route.split('/')[3]);
+      if (route === '/sheikh/roster') return await viewSheikhRoster();
       if (route === '/sheikh/requests') return await viewRequests();
       if (route === '/sheikh/promotions') return await viewPromotions();
       if (route === '/sheikh/wird') return await viewWirdMgmt();
@@ -486,7 +487,7 @@ async function renderCal(host, uid, st, onSel) {
 }
 /* ---------- sheikh views ---------- */
 function sheikhTabs(a) {
-  const l = [['/sheikh', 'الرئيسية'], ['/sheikh/members', 'الأعضاء'], ['/sheikh/requests', 'الطلبات'], ['/sheikh/promotions', 'الترقيات'], ['/sheikh/wird', 'الأوراد']];
+  const l = [['/sheikh', 'الرئيسية'], ['/sheikh/members', 'الأعضاء'], ['/sheikh/roster', 'المجموعات'], ['/sheikh/requests', 'الطلبات'], ['/sheikh/promotions', 'الترقيات'], ['/sheikh/wird', 'الأوراد']];
   return '<div class="chips">' + l.map(([p, t]) => `<a class="chip ${a === p ? 'on' : ''}" href="#${p}" style="text-decoration:none;color:inherit">${t}</a>`).join('') + '</div>';
 }
 const sheikhPage = (a, title, body) => shell(`<div class="lg"><div class="page wide" style="padding:0"><header class="top"><div><h1>${title}</h1><small>مساحة الشيخ</small></div></header>${sheikhTabs(a)}${body}</div></div>`);
@@ -566,3 +567,48 @@ async function viewWirdMgmt(editId) {
 }
 
 boot();
+
+/* ---------- roster (groups, leaders, members) ---------- */
+const MARK = { '✅': ['منتظم', '#166534', '#dcfce7'], '❌': ['متأخر', '#92400e', '#fef3c7'], '⛔': ['منقطع', '#991b1b', '#fee2e2'] };
+async function loadRoster() {
+  const [g, m] = await Promise.all([q('roster_groups', 'select=*&order=position'), q('roster_members', 'select=*&order=position')]);
+  return { g, m };
+}
+function rosterHtml(g, m, staff, accts) {
+  if (!g.length) return '<div class="rounded-lg border border-background-200 bg-background-50 p-6 text-center text-sm">لا توجد مجموعات بعد.</div>';
+  return g.map(gr => {
+    const ms = m.filter(x => x.group_id === gr.id), mine = ms.some(x => me && x.user_id === me.id);
+    const rows = ms.map(x => {
+      const mk = MARK[x.mark], pc = x.fajr_total ? Math.round(x.fajr_done / x.fajr_total * 100) : 0;
+      const link = x.user_id ? '<span style="font-size:10px;padding:1px 7px;border-radius:99px;background:#dcfce7;color:#166534">مسجّل</span>' : '<span style="font-size:10px;padding:1px 7px;border-radius:99px;background:#f1f5f9;color:#64748b">غير مسجّل</span>';
+      return `<li style="padding:11px 14px;border-top:1px solid rgba(0,0,0,.07)"><div style="display:flex;align-items:center;gap:8px;justify-content:space-between"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><b style="font-size:14px">${esc(x.full_name)}</b>${x.is_leader ? '<span style="font-size:10px;padding:1px 7px;border-radius:99px;background:#fef3c7;color:#92400e">قائد</span>' : ''}${link}</div>${mk ? `<span style="font-size:10px;padding:1px 7px;border-radius:99px;background:${mk[2]};color:${mk[1]}">${mk[0]}</span>` : ''}</div>
+<div style="margin-top:7px;height:5px;border-radius:9px;background:rgba(0,0,0,.08);overflow:hidden"><div style="height:100%;width:${pc}%;background:#16a34a"></div></div><div style="margin-top:4px;font-size:11px;opacity:.65">الفجر: ${n2a(x.fajr_done || 0)} من ${n2a(x.fajr_total || 0)} يومًا</div>
+${staff ? `<div style="display:flex;gap:6px;margin-top:8px;align-items:center">${x.user_id ? `<button data-unlink="${x.id}" style="font-size:11px;padding:5px 10px;border-radius:8px;border:1px solid rgba(0,0,0,.15);background:#fff">فك الربط</button>` : `<select data-sel="${x.id}" style="flex:1;font-size:12px;padding:5px;border-radius:8px;border:1px solid rgba(0,0,0,.15);background:#fff"><option value="">ربط بحساب مسجّل…</option>${accts.map(a => `<option value="${a.id}">${esc(a.full_name)}</option>`).join('')}</select><button data-link="${x.id}" style="font-size:11px;padding:5px 10px;border-radius:8px;border:0;background:#166534;color:#fff">ربط</button>`}<button data-rm="${x.id}" style="font-size:11px;padding:5px 10px;border-radius:8px;border:1px solid #fecaca;background:#fff;color:#b91c1c">حذف</button></div>` : ''}</li>`;
+    }).join('');
+    return `<section class="rounded-lg border border-background-200 bg-background-50" style="overflow:hidden;${mine ? 'box-shadow:0 0 0 2px #16a34a' : ''}"><div style="padding:12px 14px;background:#f0fdf4;display:flex;justify-content:space-between;align-items:center"><div><b style="font-size:15px">${esc(gr.name)}</b><div style="font-size:12px;opacity:.7;margin-top:2px">القائد: ${esc(gr.leader_name || '—')}</div></div><span style="font-size:11px;opacity:.7">${n2a(ms.length)} أعضاء${mine ? ' · مجموعتك' : ''}</span></div><ul style="list-style:none;margin:0;padding:0">${rows}</ul>${staff ? `<div style="display:flex;gap:6px;padding:10px 14px;border-top:1px solid rgba(0,0,0,.07)"><input data-addn="${gr.id}" placeholder="اسم عضو جديد" style="flex:1;font-size:13px;padding:7px 9px;border-radius:8px;border:1px solid rgba(0,0,0,.15)"><button data-add="${gr.id}" style="font-size:12px;padding:7px 12px;border-radius:8px;border:0;background:#166534;color:#fff">إضافة</button></div>` : ''}</section>`;
+  }).join('');
+}
+function bindRoster(reload) {
+  $app.onclick = async e => {
+    const t = e.target.closest('button'); if (!t) return;
+    try {
+      if (t.dataset.link) { const v = $app.querySelector(`[data-sel="${t.dataset.link}"]`).value; if (!v) return toast('اختر حسابًا'); await upd('roster_members', 'id=eq.' + t.dataset.link, { user_id: v }); }
+      else if (t.dataset.unlink) await upd('roster_members', 'id=eq.' + t.dataset.unlink, { user_id: null });
+      else if (t.dataset.rm) { if (!confirm('حذف هذا العضو من القائمة؟')) return; await del('roster_members', 'id=eq.' + t.dataset.rm); }
+      else if (t.dataset.add) { const i = $app.querySelector(`[data-addn="${t.dataset.add}"]`), n = i.value.trim(); if (!n) return; await ins('roster_members', { tenant_id: TENANT, group_id: t.dataset.add, full_name: n, position: 99 }); }
+      else return;
+      reload();
+    } catch (er) { toast(errAr(er)); }
+  };
+}
+async function viewRosterGroup() {
+  await loadMeCtx();
+  const { g, m } = await loadRoster();
+  draw(`<div class="space-y-4 md:space-y-5"><div><h1 style="font-size:18px;font-weight:700">مجموعتي</h1><p style="font-size:12px;opacity:.7;margin-top:2px">المجموعات وقادتها وأعضاؤها. الأرقام من قائمة الفجر، ١١ جمادى الآخرة ١٤٤٨.</p></div>${rosterHtml(g, m, false, [])}</div>`);
+}
+async function viewSheikhRoster() {
+  const [{ g, m }, accts] = await Promise.all([loadRoster(), q('profiles', 'select=id,full_name&role=eq.member&order=full_name')]);
+  const used = new Set(m.map(x => x.user_id).filter(Boolean)), free = accts.filter(a => !used.has(a.id));
+  $app.innerHTML = sheikhPage('/sheikh/roster', 'المجموعات', `<div class="space-y-4" style="display:grid;gap:14px"><p style="font-size:12px;opacity:.7;margin:0">كل اسم هنا يُربط تلقائيًا بحسابه عند التسجيل إذا تطابق الاسم، أو اربطه يدويًا من القائمة. الشيخ غير مضاف لهذه المجموعات.</p>${rosterHtml(g, m, true, free)}</div>`);
+  bindRoster(viewSheikhRoster);
+}
