@@ -383,6 +383,9 @@ aside.sticky nav a{font-size:15px!important}
 .rp{font-size:13px!important}.rp td{font-size:13.5px!important}.rp th{font-size:12.5px!important}
 td.ok{font-size:16px!important}
 }
+nav.fixed li{min-width:0!important;flex:1 1 0!important}
+nav.fixed li a{padding-left:1px!important;padding-right:1px!important}
+nav.fixed li a>span:last-child{font-size:10.5px!important;line-height:1.2!important;text-align:center!important;white-space:normal!important}
 .ra .muted{opacity:1;color:#33443a}
 .sp .l,.sp p{opacity:1!important}
 input,select,textarea{font-size:16px}
