@@ -267,6 +267,20 @@ async function viewPending() {
 
 /* ---------- data shared ---------- */
 async function loadActivities() { return await q('wird_activities', 'select=*&is_active=eq.true&order=order_index.asc,created_at.asc'); }
+async function loadMyActs() {
+  const acts0 = await loadActivities(); if (!me.stage_id) return acts0;
+  const sw = await q('stage_wird', 'select=*&stage_id=eq.' + me.stage_id + '&limit=500'); if (!sw.length) return acts0;
+  const m = {}; sw.forEach(r => m[r.activity_id] = r); const now = new Date(), w = now.getDay(), hd = hjDay(now), out = [];
+  acts0.forEach(a => {
+    const r = m[a.id]; if (!r || !r.enabled) return; const rl = a.day_rule || 'daily', c = Object.assign({}, a);
+    if (rl === 'fri' && w !== 5) return;
+    if (rl === 'fast') { const qt = r.per_week || r.per_month; if (!qt) { if (!(w === 1 || w === 4 || (hd >= 13 && hd <= 15))) return; } else { c.description = (r.note ? r.note + ' · ' : '') + (r.per_week ? 'المطلوب ' + n2a(r.per_week) + ' في الأسبوع' : '') + (r.per_month ? ' · ' + n2a(r.per_month) + ' أيام في الشهر' : ''); } }
+    if (r.target_count != null) { if (a.type === 'quran') { if (r.target_count < 1) { c.quran_parts = 1; c._half = true; } else c.quran_parts = Math.round(r.target_count); } else c.target_count = r.target_count; }
+    if (r.max_val != null) c.max_val = r.max_val;
+    out.push(c);
+  });
+  return out;
+}
 async function loadDay(uid, date) {
   const [logs, parts] = await Promise.all([q('wird_logs', `select=*&member_id=eq.${uid}&log_date=eq.${date}`), q('wird_part_logs', `select=*&member_id=eq.${uid}&log_date=eq.${date}&completed=eq.true`)]);
   return { logs, parts };
@@ -274,6 +288,7 @@ async function loadDay(uid, date) {
 function actState(a, day) {
   const log = day.logs.find(l => l.activity_id === a.id);
   if (a.type === 'toggle') return { done: !!(log && log.completed), val: 0, total: 1 };
+  if (a.type === 'counter' && a.max_val != null) { const v = log ? +log.counter_value : 0; return { done: v > 0 && v <= a.max_val && (a.min_val == null || v >= a.min_val), val: v, total: a.max_val, sleep: true }; }
   if (a.type === 'counter') { const v = log ? log.counter_value : 0, t = a.target_count || 1; return { done: v >= t, val: v, total: t }; }
   const n = a.quran_parts || 1, got = day.parts.filter(p => p.activity_id === a.id).map(p => p.part_index); return { done: got.length >= n, val: got.length, total: n, got };
 }
@@ -389,12 +404,13 @@ function wardArticle(a) {
   const head = `<div class="flex items-start gap-3"><span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md ${done ? 'bg-primary-100 text-primary-700' : 'bg-background-100 text-foreground-500'}"><i class="${ic} text-base"></i></span><div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-x-2 gap-y-1"><h3 class="text-[13px] font-medium leading-snug ${done ? 'text-foreground-600' : 'text-foreground-950'}">${esc(a.title)}</h3><span class="rounded-full border border-background-300 bg-background-100 px-2 py-0.5 text-[10px] text-foreground-500">${badge}</span>${done ? '<span class="inline-flex items-center gap-0.5 rounded-full bg-primary-100 px-2 py-0.5 text-[10px] text-primary-800"><i class="ri-check-double-line text-[11px]"></i>مكتمل</span>' : ''}</div>${a.description ? `<p class="mt-1 text-[11px] leading-relaxed text-foreground-500">${esc(a.description)}</p>` : ''}<p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-foreground-500"><span class="num">${meta(a)}</span></p></div>`;
   const wrap = body => `<article class="rounded-lg border p-3.5 transition-colors duration-smooth ${done ? 'border-primary-200 bg-primary-50' : 'border-background-200 bg-background-50'}">${body}</article>`;
   if (a.type === 'toggle') return wrap(head + `<button type="button" data-a="${a.id}" data-k="t" aria-pressed="${done}" aria-label="${done ? 'إلغاء تسجيل ' : 'تسجيل '}${esc(a.title)}" class="mt-0.5 flex h-9 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md border px-3 text-[11.5px] transition-colors duration-smooth ${done ? 'border-primary-300 bg-primary-100 text-primary-800 hover:bg-primary-200' : 'border-background-300 bg-background-50 text-foreground-700 hover:border-primary-300 hover:bg-background-100'}"><i class="${done ? 'ri-check-line' : 'ri-add-line'} text-[13px]"></i>${done ? 'تم' : 'تسجيل'}</button></div>`);
+  if (st.sleep) return wrap(head + `</div><div class="mt-3 flex items-center justify-between gap-3 rounded-md border border-background-200 bg-background-100/70 p-2.5"><label for="sl" class="text-[11.5px] text-foreground-700">كم ساعة نمت؟ <span class="text-foreground-400">(الحد الأقصى ${n2a(st.total)})</span></label><input id="sl" data-h="${a.id}" type="number" inputmode="decimal" min="0" max="24" step="0.5" value="${st.val || ''}" placeholder="٠" style="width:84px;height:38px;text-align:center;border:1px solid #cfd9cc;border-radius:8px;font:inherit;font-size:15px;background:#fff"></div>`);
   if (a.type === 'counter') return wrap(head + `</div><div class="mt-3 rounded-md border border-background-200 bg-background-100/70 p-2.5"><div class="flex items-center justify-between gap-2"><button type="button" data-a="${a.id}" data-k="m" ${st.val <= 0 ? 'disabled' : ''} aria-label="إنقاص عدد ${esc(a.title)}" class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-background-300 bg-background-50 text-foreground-700 transition-colors duration-smooth hover:bg-background-200 disabled:cursor-not-allowed disabled:opacity-40"><i class="ri-subtract-line text-[14px]"></i></button><div class="min-w-0 flex-1 text-center"><p class="num text-[16px] font-semibold leading-none text-foreground-950">${n2a(st.val)}<span class="text-[11px] font-normal text-foreground-400"> / ${n2a(st.total)}</span></p><p class="mt-1 text-[10px] text-foreground-500">الهدف اليومي ${n2a(st.total)} ${esc(UNIT(a))}</p></div><button type="button" data-a="${a.id}" data-k="p" aria-label="زيادة عدد ${esc(a.title)}" class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-primary-300 bg-primary-600 text-background-50 transition-colors duration-smooth hover:bg-primary-700"><i class="ri-add-line text-[14px]"></i></button></div><div class="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-background-200"><div class="h-full rounded-full bg-primary-500 transition-all duration-smooth" style="width:${Math.min(100, pct(st.val, st.total))}%"></div></div></div>`);
-  const lbl = a.quran_unit === 'pages' ? 'الصفحة' : 'الجزء';
-  return wrap(head + `</div><div class="mt-3"><p class="num text-[10.5px] text-foreground-500">سجّلت ${n2a(st.val)} من ${n2a(st.total)}</p><div class="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-3">${Array.from({ length: st.total }, (_, i) => { const on = st.got.includes(i); return `<button type="button" data-a="${a.id}" data-k="q" data-i="${i}" aria-pressed="${on}" class="flex cursor-pointer items-center justify-between gap-1.5 rounded-md border px-2.5 py-2 text-[11px] transition-colors duration-smooth ${on ? 'border-primary-300 bg-primary-100 text-primary-800' : 'border-background-300 bg-background-50 text-foreground-600 hover:border-primary-300 hover:bg-background-100'}"><span class="whitespace-nowrap">${lbl} ${n2a(i + 1)}</span><span class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${on ? 'border-primary-600 bg-primary-600 text-background-50' : 'border-background-300 text-transparent'}"><i class="ri-check-line text-[10px]"></i></span></button>`; }).join('')}</div><div class="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-background-200"><div class="h-full rounded-full bg-primary-500 transition-all duration-smooth" style="width:${pct(st.val, st.total)}%"></div></div></div>`);
+  const lbl = a._half ? 'نصف جزء' : a.quran_unit === 'pages' ? 'الصفحة' : 'الجزء';
+  return wrap(head + `</div><div class="mt-3"><p class="num text-[10.5px] text-foreground-500">سجّلت ${n2a(st.val)} من ${n2a(st.total)}</p><div class="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-3">${Array.from({ length: st.total }, (_, i) => { const on = st.got.includes(i); return `<button type="button" data-a="${a.id}" data-k="q" data-i="${i}" aria-pressed="${on}" class="flex cursor-pointer items-center justify-between gap-1.5 rounded-md border px-2.5 py-2 text-[11px] transition-colors duration-smooth ${on ? 'border-primary-300 bg-primary-100 text-primary-800' : 'border-background-300 bg-background-50 text-foreground-600 hover:border-primary-300 hover:bg-background-100'}"><span class="whitespace-nowrap">${a._half ? lbl : lbl + ' ' + n2a(i + 1)}</span><span class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${on ? 'border-primary-600 bg-primary-600 text-background-50' : 'border-background-300 text-transparent'}"><i class="ri-check-line text-[10px]"></i></span></button>`; }).join('')}</div><div class="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-background-200"><div class="h-full rounded-full bg-primary-500 transition-all duration-smooth" style="width:${pct(st.val, st.total)}%"></div></div></div>`);
 }
 async function viewWard() {
-  const [acts, day] = await Promise.all([loadActivities(), loadDay(me.id, today())]);
+  const [acts, day] = await Promise.all([loadMyActs(), loadDay(me.id, today())]);
   ctx.acts = acts; ctx.day = day;
   const paint = () => {
     const sts = acts.map(a => actState(a, ctx.day)), done = sts.filter(s => s.done).length, partial = sts.filter(s => !s.done && s.val > 0).length, total = acts.length, P = pct(done, total), rem = total - done, d = new Date();
@@ -410,6 +426,11 @@ ${sec || '<div class="rounded-lg border border-background-200 bg-background-50 p
   paint();
 }
 function bindWard(paint) {
+  $app.querySelectorAll('[data-h]').forEach(el => el.onchange = async () => {
+    const a = ctx.acts.find(x => x.id === el.dataset.h), day = ctx.day, prev = JSON.stringify(day); let v = parseFloat(el.value); if (!(v >= 0)) v = 0; v = Math.min(24, Math.round(v * 2) / 2);
+    const c = v > 0 && v <= a.max_val; const l = day.logs.find(l => l.activity_id === a.id); if (l) { l.completed = c; l.counter_value = v; } else day.logs.push({ activity_id: a.id, completed: c, counter_value: v });
+    try { ctx.syncState = 'saving'; paint(); await setLog(a, c, v); ctx.syncState = 'ok'; setSync('ok'); ctx.syncState = 'idle'; } catch (e) { ctx.day = JSON.parse(prev); ctx.syncState = 'err'; paint(); toast('تعذّر الحفظ: ' + errAr(e)); ctx.syncState = 'idle'; }
+  });
   $app.querySelectorAll('[data-a]').forEach(el => el.onclick = async () => {
     const a = ctx.acts.find(x => x.id === el.dataset.a), k = el.dataset.k, day = ctx.day, prev = JSON.stringify(day);
     const log = day.logs.find(l => l.activity_id === a.id);
@@ -999,14 +1020,14 @@ function exportPdf() {
   w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${d.title}</title><style>@page{size:A4 landscape;margin:8mm}body{font-family:Tahoma,'Noto Sans Arabic',Arial,sans-serif;color:#14391f;margin:0}h1{font-size:17px;margin:0;color:#0f4d27}p{margin:3px 0 8px;color:#555;font-size:11px}table{border-collapse:collapse;width:100%;font-size:9px;table-layout:fixed}th{background:#166534;color:#fff;padding:4px 2px;border:1px solid #0f4d27;font-weight:600}th.g{background:#0f4d27}td{padding:2px;text-align:center;border:1px solid #d9e4d6;height:15px}td:first-child{background:#eef5ea;font-weight:700;width:62px}td.fr{background:#e2f3e6}td.ok{color:#15803d;font-weight:800}td.no{color:#dc2626;background:#fef2f2;font-weight:800}td.pk{background:#ffe4e6}td.na{color:#ccc}tr.sm td{background:#e7f1e3;font-weight:800}small{font-size:7px;color:#475569;display:block}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}</style></head><body><h1>مُتَرَبِّي · ${d.title}</h1><p>${d.sub}</p>${d.tables.map((t, i) => (i ? '<h2 style="font-size:13px;margin:10px 0 4px">' + d.heads[1] + '</h2>' : '') + t).join('')}<script>setTimeout(function(){window.print()},400)<\/script></body></html>`);
   w.document.close();
 }
-function exportPng() {
-  const d = reportDoc(), tb = document.querySelector('.rv .tw.main table.rp'), FONT = '"Noto Sans Arabic","Tajawal",Tahoma,Arial,sans-serif';
+function pngCanvas(tb, d, first) {
+  const FONT = '"Noto Sans Arabic","Tajawal",Tahoma,Arial,sans-serif';
   const grid = [], cells = []; [...tb.rows].forEach((tr, ri) => { grid[ri] = grid[ri] || []; let ci = 0; [...tr.cells].forEach(c => { while (grid[ri][ci]) ci++; const cs = c.colSpan, rs = c.rowSpan; for (let a = 0; a < rs; a++) for (let b = 0; b < cs; b++) { grid[ri + a] = grid[ri + a] || []; grid[ri + a][ci + b] = 1; } cells.push({ c, r: ri, col: ci, cs, rs }); ci += cs; }); });
-  const nc = Math.max(...cells.map(x => x.col + x.cs)), nr = grid.length, fw = 96, cw = 50, rh = 24, pad = 20, hh = 60;
+  const nc = Math.max(...cells.map(x => x.col + x.cs)), nr = grid.length, fw = 96, cw = 50, rh = 24, pad = 20, hh = first ? 60 : 36;
   const W = pad * 2 + fw + (nc - 1) * cw, H = hh + nr * rh + 50;
   const cv = document.createElement('canvas'); cv.width = W * 2; cv.height = H * 2; const c = cv.getContext('2d'); c.scale(2, 2); c.direction = 'rtl'; c.textBaseline = 'middle'; c.textAlign = 'center';
   c.fillStyle = '#fbf8ef'; c.fillRect(0, 0, W, H); c.fillStyle = '#14532d'; c.fillRect(0, 0, W, hh - 8);
-  c.fillStyle = '#fff'; c.textAlign = 'right'; c.font = `700 17px ${FONT}`; c.fillText('مُتَرَبِّي · ' + d.title, W - pad, 20); c.font = `11px ${FONT}`; c.fillStyle = '#d8f3e3'; c.fillText(d.sub, W - pad, 40); c.textAlign = 'center';
+  c.fillStyle = '#fff'; c.textAlign = 'right'; if (first) { c.font = `700 17px ${FONT}`; c.fillText('مُتَرَبِّي · ' + d.title, W - pad, 20); c.font = `11px ${FONT}`; c.fillStyle = '#d8f3e3'; c.fillText(d.sub, W - pad, 40); } else { c.font = `700 15px ${FONT}`; c.fillText('وليمة الجمعة', W - pad, 14); } c.textAlign = 'center';
   const rowOf = ri => ri, X = (col, cs) => { const right = W - pad - (col === 0 ? 0 : fw + (col - 1) * cw), w = (col === 0 ? fw : 0) + (col === 0 ? (cs - 1) * cw : cs * cw); return [right - w, w]; };
   cells.forEach(({ c: el, r, col, cs, rs }) => {
     const [x, w] = X(col, cs), y = hh + r * rh, h = rs * rh, k = el.dataset.k, isH = el.tagName === 'TH';
@@ -1020,7 +1041,16 @@ function exportPng() {
       if (n) { c.fillStyle = '#475569'; c.font = `9px ${FONT}`; c.fillText(String(el.querySelector('small') ? el.querySelector('small').textContent : n), cx + 12, cy, 22); }
     } else { c.fillStyle = fg; c.font = `${isH || col === 0 || k === 'sm' ? '700 ' : ''}${isH ? 10.5 : 11}px ${FONT}`; c.fillText(el.textContent.trim(), cx, cy, w - 4); }
   });
-  c.fillStyle = '#6b7a6f'; c.font = `10px ${FONT}`; c.fillText('أُنشئ تلقائيًا من تسجيلات الورد في مُتَرَبِّي · الخانة الفارغة = غير مستحقة', W / 2, H - 14);
+  if (!first) { /* no footer */ }
+  return { cv, W, H };
+}
+function exportPng() {
+  const d = reportDoc(), tbs = [...document.querySelectorAll('.rv .tw.main table.rp')], FONT = '"Noto Sans Arabic","Tajawal",Tahoma,Arial,sans-serif';
+  const parts = tbs.map((t, i) => pngCanvas(t, d, i === 0)); const W = Math.max(...parts.map(p => p.W)), gap = 12, foot = 30;
+  const H = parts.reduce((a, p) => a + p.H - 40 + gap, 0) + foot;
+  const cv = document.createElement('canvas'); cv.width = W * 2; cv.height = H * 2; const c = cv.getContext('2d'); c.scale(2, 2); c.fillStyle = '#fbf8ef'; c.fillRect(0, 0, W, H);
+  let y = 0; parts.forEach(p => { c.drawImage(p.cv, 0, 0, p.cv.width, (p.H - 40) * 2, W - p.W, y, p.W, p.H - 40); y += p.H - 40 + gap; });
+  c.fillStyle = '#6b7a6f'; c.font = `10px ${FONT}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.direction = 'rtl'; c.fillText('أُنشئ تلقائيًا من تسجيلات الورد في مُتَرَبِّي · الخانة الفارغة = غير مستحقة', W / 2, H - 14);
   const url = cv.toDataURL('image/png');
   const o = document.createElement('div'); o.style.cssText = 'position:fixed;inset:0;z-index:99;background:rgba(0,0,0,.7);overflow:auto;padding:16px';
   o.innerHTML = `<div style="background:#fff;border-radius:14px;padding:12px;max-width:900px;margin:0 auto"><img src="${url}" style="width:100%;border-radius:8px"><div style="display:flex;gap:8px;margin-top:10px"><a id="dl" download="تقرير-الورد.png" href="${url}" style="flex:1;text-align:center;background:#166534;color:#fff;padding:10px;border-radius:8px;text-decoration:none;font-size:13px">حفظ الصورة</a><button id="sh" style="flex:1;border:1px solid #166534;color:#166534;background:#fff;border-radius:8px;font:inherit;font-size:13px">مشاركة</button><button id="cl" style="border:1px solid #ccc;background:#fff;border-radius:8px;padding:0 14px">إغلاق</button></div></div>`;
