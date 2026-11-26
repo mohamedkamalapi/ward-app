@@ -162,7 +162,7 @@ async function render() {
     if (route === '/ward/history') return await viewHistory();
     if (route === '/more') return await viewMore();
     if (route === '/settings') return await viewSettings();
-    if (route === '/quran') return await viewQuran();
+    if (route === '/quran') return go('/ward');
     if (route === '/progress') return await viewStatic('progress');
     if (route === '/seasons') return await viewStatic('seasons');
     if (route.startsWith('/seasons/')) return await viewStatic('season');
@@ -341,7 +341,7 @@ async function setLog(a, completed, counter) {
 
 /* ---------- Readdy-style shell & member views ---------- */
 function navItems() {
-  const b = [['/', 'ri-home-4-line', 'الرئيسية'], ['/ward', 'ri-checkbox-circle-line', 'وردي'], ['/quran', 'ri-book-open-line', 'القرآن'], ['/progress', 'ri-line-chart-line', 'تقدمي'], ['/seasons', 'ri-calendar-line', 'المواسم'], ['/group', 'ri-group-line', 'مجموعتي']];
+  const b = [['/', 'ri-home-4-line', 'الرئيسية'], ['/ward', 'ri-checkbox-circle-line', 'وردي'], ['/progress', 'ri-line-chart-line', 'تقدمي'], ['/seasons', 'ri-calendar-line', 'المواسم'], ['/group', 'ri-group-line', 'مجموعتي']];
   const st = isStaff() ? [['/sheikh', 'ri-dashboard-line', 'لوحة الشيخ'], ['/sheikh/reports', 'ri-table-line', 'الجداول'], ['/sheikh/stages', 'ri-stairs-line', 'المراحل'], ['/sheikh/members', 'ri-team-line', 'الأعضاء'], ['/sheikh/roster', 'ri-group-2-line', 'المجموعات']].concat(me.role === 'supervisor' ? [] : [['/sheikh/wird', 'ri-list-check-2', 'الأوراد']]).concat([['/sheikh/requests', 'ri-user-add-line', 'الطلبات'], ['/sheikh/promotions', 'ri-medal-line', 'الترقيات']]) : [];
   return b.concat(st, [['/settings', 'ri-settings-3-line', 'الإعدادات']]);
 }
@@ -454,11 +454,11 @@ function wardArticle(a) {
   if (st.sleep) return wrap(head + `</div><div class="mt-3 flex items-center justify-between gap-3 rounded-md border border-background-200 bg-background-100/70 p-2.5"><label for="sl" class="text-[11.5px] text-foreground-700">كم ساعة نمت؟ <span class="text-foreground-400">(الحد الأقصى ${n2a(st.total)})</span></label><input id="sl" data-h="${a.id}" type="number" inputmode="decimal" min="0" max="24" step="0.5" value="${st.val || ''}" placeholder="٠" style="width:84px;height:38px;text-align:center;border:1px solid #cfd9cc;border-radius:8px;font:inherit;font-size:15px;background:#fff"></div>`);
   if (a.type === 'counter') return wrap(head + `</div><div class="mt-3 rounded-md border border-background-200 bg-background-100/70 p-2.5"><div class="flex items-center justify-between gap-2"><button type="button" data-a="${a.id}" data-k="m" ${st.val <= 0 ? 'disabled' : ''} aria-label="إنقاص عدد ${esc(a.title)}" class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-background-300 bg-background-50 text-foreground-700 transition-colors duration-smooth hover:bg-background-200 disabled:cursor-not-allowed disabled:opacity-40"><i class="ri-subtract-line text-[14px]"></i></button><div class="min-w-0 flex-1 text-center"><p class="num text-[16px] font-semibold leading-none text-foreground-950">${n2a(st.val)}<span class="text-[11px] font-normal text-foreground-400"> / ${n2a(st.total)}</span></p><p class="mt-1 text-[10px] text-foreground-500">الهدف اليومي ${n2a(st.total)} ${esc(UNIT(a))}</p></div><button type="button" data-a="${a.id}" data-k="p" aria-label="زيادة عدد ${esc(a.title)}" class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-primary-300 bg-primary-600 text-background-50 transition-colors duration-smooth hover:bg-primary-700"><i class="ri-add-line text-[14px]"></i></button></div><div class="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-background-200"><div class="h-full rounded-full bg-primary-500 transition-all duration-smooth" style="width:${Math.min(100, pct(st.val, st.total))}%"></div></div></div>${juzBlock(a)}`);
   const lbl = a._half ? 'نصف جزء' : a.quran_unit === 'pages' ? 'الصفحة' : 'الجزء';
-  return wrap(head + `</div><div class="mt-3"><p class="num text-[10.5px] text-foreground-500">سجّلت ${n2a(st.val)} من ${n2a(st.total)}</p><div class="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-3">${Array.from({ length: st.total }, (_, i) => { const on = st.got.includes(i); return `<button type="button" data-a="${a.id}" data-k="q" data-i="${i}" aria-pressed="${on}" class="flex cursor-pointer items-center justify-between gap-1.5 rounded-md border px-2.5 py-2 text-[11px] transition-colors duration-smooth ${on ? 'border-primary-300 bg-primary-100 text-primary-800' : 'border-background-300 bg-background-50 text-foreground-600 hover:border-primary-300 hover:bg-background-100'}"><span class="whitespace-nowrap">${a._half ? lbl : lbl + ' ' + n2a(i + 1)}</span><span class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${on ? 'border-primary-600 bg-primary-600 text-background-50' : 'border-background-300 text-transparent'}"><i class="ri-check-line text-[10px]"></i></span></button>`; }).join('')}</div><div class="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-background-200"><div class="h-full rounded-full bg-primary-500 transition-all duration-smooth" style="width:${pct(st.val, st.total)}%"></div></div></div>`);
+  return wrap(head + `</div><div class="mt-3"><p class="num text-[10.5px] text-foreground-500">سجّلت ${n2a(st.val)} من ${n2a(st.total)}</p><div class="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-3">${Array.from({ length: st.total }, (_, i) => { const on = st.got.includes(i); return `<button type="button" data-a="${a.id}" data-k="q" data-i="${i}" aria-pressed="${on}" class="flex cursor-pointer items-center justify-between gap-1.5 rounded-md border px-2.5 py-2 text-[11px] transition-colors duration-smooth ${on ? 'border-primary-300 bg-primary-100 text-primary-800' : 'border-background-300 bg-background-50 text-foreground-600 hover:border-primary-300 hover:bg-background-100'}"><span class="whitespace-nowrap">${a._half ? lbl : lbl + ' ' + n2a(i + 1)}</span><span class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${on ? 'border-primary-600 bg-primary-600 text-background-50' : 'border-background-300 text-transparent'}"><i class="ri-check-line text-[10px]"></i></span></button>`; }).join('')}</div><div class="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-background-200"><div class="h-full rounded-full bg-primary-500 transition-all duration-smooth" style="width:${pct(st.val, st.total)}%"></div></div></div>${ctx.qr && a === ctx.acts.find(x => x.type === 'quran') ? '<div id="qp" class="mt-3"></div>' : ''}`);
 }
 async function viewWard() {
   const [acts, day] = await Promise.all([loadMyActs(), loadDay(me.id, today())]);
-  ctx.acts = acts; ctx.day = day; ctx.juzOther = 0; ctx.wardFast = false;
+  ctx.acts = acts; ctx.day = day; ctx.juzOther = 0; ctx.wardFast = false; ctx.qr = null; if (acts.some(a => a.type === 'quran')) { try { await qpLoad(); } catch (e) { } }
   if (acts.some(a => a.monthly_juz)) { try { const t0 = new Date(); t0.setDate(t0.getDate() - (hjDay(t0) - 1)); const rows = await q('wird_logs', `select=log_date,qiyam_juz&member_id=eq.${me.id}&log_date=gte.${ymd(t0)}&log_date=lt.${today()}&qiyam_juz=gt.0`); ctx.juzOther = rows.reduce((a, r) => a + (+r.qiyam_juz || 0), 0); } catch (e) { } }
   const paint = () => {
     const sts = acts.map(a => actState(a, ctx.day)), done = sts.filter(s => s.done).length, partial = sts.filter(s => !s.done && s.val > 0).length, total = acts.length, P = pct(done, total), rem = total - done, d = new Date();
@@ -475,6 +475,7 @@ ${sec || '<div class="rounded-lg border border-background-200 bg-background-50 p
   paint();
 }
 function bindWard(paint) {
+  qpPaint();
   $app.querySelectorAll('[data-nv]').forEach(el => el.onchange = async () => {
     const a = ctx.acts.find(x => x.id === el.dataset.nv), day = ctx.day, prev = JSON.stringify(day); let v = Math.round(parseFloat(el.value)); if (!(v >= 0)) v = 0; v = Math.min(100000, v);
     const c = v >= (a.target_count || 1), l = day.logs.find(l => l.activity_id === a.id); if (l) { l.completed = c; l.counter_value = v; } else day.logs.push({ activity_id: a.id, completed: c, counter_value: v });
@@ -602,36 +603,30 @@ async function renderCal(host, uid, st, onSel) {
 /* ---------- sheikh views ---------- */
 /* ---------- quran picker ---------- */
 const SURAH = [['الفاتحة',7],['البقرة',286],['آل عمران',200],['النساء',176],['المائدة',120],['الأنعام',165],['الأعراف',206],['الأنفال',75],['التوبة',129],['يونس',109],['هود',123],['يوسف',111],['الرعد',43],['إبراهيم',52],['الحجر',99],['النحل',128],['الإسراء',111],['الكهف',110],['مريم',98],['طه',135],['الأنبياء',112],['الحج',78],['المؤمنون',118],['النور',64],['الفرقان',77],['الشعراء',227],['النمل',93],['القصص',88],['العنكبوت',69],['الروم',60],['لقمان',34],['السجدة',30],['الأحزاب',73],['سبأ',54],['فاطر',45],['يس',83],['الصافات',182],['ص',88],['الزمر',75],['غافر',85],['فصلت',54],['الشورى',53],['الزخرف',89],['الدخان',59],['الجاثية',37],['الأحقاف',35],['محمد',38],['الفتح',29],['الحجرات',18],['ق',45],['الذاريات',60],['الطور',49],['النجم',62],['القمر',55],['الرحمن',78],['الواقعة',96],['الحديد',29],['المجادلة',22],['الحشر',24],['الممتحنة',13],['الصف',14],['الجمعة',11],['المنافقون',11],['التغابن',18],['الطلاق',12],['التحريم',12],['الملك',30],['القلم',52],['الحاقة',52],['المعارج',44],['نوح',28],['الجن',28],['المزمل',20],['المدثر',56],['القيامة',40],['الإنسان',31],['المرسلات',50],['النبأ',40],['النازعات',46],['عبس',42],['التكوير',29],['الانفطار',19],['المطففين',36],['الانشقاق',25],['البروج',22],['الطارق',17],['الأعلى',19],['الغاشية',26],['الفجر',30],['البلد',20],['الشمس',15],['الليل',21],['الضحى',11],['الشرح',8],['التين',8],['العلق',19],['القدر',5],['البينة',8],['الزلزلة',8],['العاديات',11],['القارعة',11],['التكاثر',8],['العصر',3],['الهمزة',9],['الفيل',5],['قريش',4],['الماعون',7],['الكوثر',3],['الكافرون',6],['النصر',3],['المسد',5],['الإخلاص',4],['الفلق',5],['الناس',6]];
-async function viewQuran() {
-  await loadMeCtx();
-  const reads = await q('quran_reads', `select=*&member_id=eq.${me.id}&order=created_at.desc&limit=200`);
-  const td = today(); let list = reads.filter(r => r.read_date === td); const last = reads[0];
-  const sName = n => SURAH[n - 1][0];
-  const paint = () => {
-    const tot = list.reduce((a, r) => a + (r.to_ayah - r.from_ayah + 1), 0), cur = ctx.qsel || (last ? { s: last.surah, f: last.to_ayah < SURAH[last.surah - 1][1] ? last.to_ayah + 1 : 1 } : { s: 1, f: 1 });
-    if (last && cur.s === last.surah && cur.f > SURAH[cur.s - 1][1]) { cur.s = Math.min(114, cur.s + 1); cur.f = 1; }
-    const max = SURAH[cur.s - 1][1];
-    const inp = 'width:100%;height:50px;border:1.5px solid #86b99a;border-radius:12px;font:inherit;font-size:19px;font-weight:700;text-align:center;background:#fff;color:#0f3d24';
-    draw(wrapS(`<div style="display:grid;gap:14px"><div><h1 style="margin:0;color:#0f3d24">ورد القرآن</h1><p style="margin:4px 0 0;font-size:16px;color:#33443a">اختر السورة ومن أي آية إلى أي آية قرأت، ثم اضغط حفظ.</p></div>
-${last ? `<section class="rounded-lg border border-accent-300 bg-accent-50 p-4"><p style="margin:0;font-size:14px;font-weight:600;color:#6b4a00">آخر موضع وقفت عنده</p><p style="margin:4px 0 0;font-size:22px;font-weight:800;color:#3d2a00">سورة ${esc(sName(last.surah))} · الآية ${n2a(last.to_ayah)}</p></section>` : ''}
-<section class="rounded-lg border border-background-300 bg-background-50 p-4" style="display:grid;gap:12px"><label style="font-size:16px;font-weight:700;color:#0f3d24">السورة</label><select id="qs" style="${inp};text-align-last:center">${SURAH.map((x, i) => `<option value="${i + 1}" ${i + 1 === cur.s ? 'selected' : ''}>${n2a(i + 1)}. ${x[0]} (${n2a(x[1])} آية)</option>`).join('')}</select>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div><label style="font-size:16px;font-weight:700;color:#0f3d24">من الآية</label><input id="qf" type="number" inputmode="numeric" min="1" max="${max}" value="${cur.f}" style="${inp}"></div><div><label style="font-size:16px;font-weight:700;color:#0f3d24">إلى الآية</label><input id="qt" type="number" inputmode="numeric" min="1" max="${max}" value="${cur.t || max}" style="${inp}"></div></div>
-<button type="button" id="qall" style="border:1px solid #86b99a;background:#fff;color:#166534;border-radius:12px;padding:10px;font:inherit;font-size:15px;font-weight:700;cursor:pointer">إلى آخر السورة (${n2a(max)})</button>
-<button type="button" id="qsave" style="border:0;background:#166534;color:#fff;border-radius:14px;padding:15px;font:inherit;font-size:19px;font-weight:800;cursor:pointer">حفظ القراءة</button><p id="qe" style="margin:0;color:#b91c1c;font-size:15px;font-weight:600"></p></section>
-<section class="rounded-lg border border-background-300 bg-background-50 p-4"><h2 style="margin:0 0 8px;color:#0f3d24">قراءة اليوم · ${n2a(tot)} آية</h2>${list.length ? `<ul style="list-style:none;margin:0;padding:0;display:grid;gap:8px">${list.map(r => `<li style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #d9e4d6;border-radius:12px;font-size:17px;font-weight:600;color:#14391f"><span style="flex:1">${esc(sName(r.surah))} · من ${n2a(r.from_ayah)} إلى ${n2a(r.to_ayah)}</span><button data-qd="${r.id}" aria-label="حذف" style="border:1px solid #f1b4b4;background:#fff5f5;color:#b91c1c;border-radius:10px;padding:6px 10px;font:inherit;font-size:14px;cursor:pointer">حذف</button></li>`).join('')}</ul>` : '<p style="margin:0;font-size:16px;color:#33443a">لم تسجّل قراءة اليوم بعد.</p>'}</section></div>`));
-    const ss = document.getElementById('qs'), qf = document.getElementById('qf'), qt = document.getElementById('qt');
-    ss.onchange = () => { ctx.qsel = { s: +ss.value, f: 1 }; paint(); };
-    document.getElementById('qall').onclick = () => { qt.value = max; };
-    document.getElementById('qsave').onclick = async () => {
-      const f = Math.round(+qf.value), t = Math.round(+qt.value), e = document.getElementById('qe');
-      if (!(f >= 1 && t >= f && t <= max)) { e.textContent = 'تأكد أن الآية الأولى أقل من أو تساوي الأخيرة، ولا تزيد عن ' + n2a(max); return; }
-      const row = { tenant_id: TENANT, member_id: me.id, read_date: td, surah: cur.s, from_ayah: f, to_ayah: t };
-      const tmp = Object.assign({ id: 'tmp' + Date.now(), created_at: new Date().toISOString() }, row); list = [tmp].concat(list); reads.unshift(tmp); ctx.qsel = { s: t >= max ? Math.min(114, cur.s + 1) : cur.s, f: t >= max ? 1 : t + 1 }; paint();
-      try { const r = await ins('quran_reads', row); const real = Array.isArray(r) ? r[0] : r; if (real && real.id) { tmp.id = real.id; paint(); } toast('تم الحفظ'); } catch (er) { list = list.filter(x => x !== tmp); const k = reads.indexOf(tmp); if (k >= 0) reads.splice(k, 1); paint(); toast('تعذّر الحفظ: ' + errAr(er)); }
-    };
-    $app.querySelectorAll('[data-qd]').forEach(b => b.onclick = async () => { const id = b.dataset.qd; list = list.filter(x => x.id !== id); const k = reads.findIndex(x => x.id === id); if (k >= 0) reads.splice(k, 1); paint(); try { await del('quran_reads', 'id=eq.' + id); } catch (er) { toast('تعذّر الحذف'); } });
+async function qpLoad() { const reads = await q('quran_reads', `select=*&member_id=eq.${me.id}&order=created_at.desc&limit=200`); ctx.qr = { reads, sel: null }; }
+function qpPaint() {
+  const box = document.getElementById('qp'); if (!box || !ctx.qr) return;
+  const R = ctx.qr, reads = R.reads, td = today(), list = reads.filter(r => r.read_date === td), last = reads[0], sName = n => SURAH[n - 1][0];
+  const tot = list.reduce((a, r) => a + (r.to_ayah - r.from_ayah + 1), 0);
+  const cur = R.sel || (last ? (last.to_ayah < SURAH[last.surah - 1][1] ? { s: last.surah, f: last.to_ayah + 1 } : { s: Math.min(114, last.surah + 1), f: 1 }) : { s: 1, f: 1 }), max = SURAH[cur.s - 1][1];
+  const inp = 'width:100%;height:48px;border:1.5px solid #86b99a;border-radius:12px;font:inherit;font-size:19px;font-weight:700;text-align:center;background:#fff;color:#0f3d24';
+  box.innerHTML = `<div style="border-top:1px dashed #bcd9c6;padding-top:12px;display:grid;gap:10px">${last ? `<p style="margin:0;font-size:15px;font-weight:700;color:#6b4a00;background:#fdf3d8;border-radius:10px;padding:8px 12px">آخر موضع وقفت عنده: سورة ${esc(sName(last.surah))} · الآية ${n2a(last.to_ayah)}</p>` : ''}
+<label style="font-size:16px;font-weight:700;color:#0f3d24">السورة</label><select id="qs" style="${inp};text-align-last:center">${SURAH.map((x, i) => `<option value="${i + 1}" ${i + 1 === cur.s ? 'selected' : ''}>${n2a(i + 1)}. ${x[0]} (${n2a(x[1])} آية)</option>`).join('')}</select>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div><label style="font-size:16px;font-weight:700;color:#0f3d24">من الآية</label><input id="qf" type="number" inputmode="numeric" min="1" max="${max}" value="${cur.f}" style="${inp}"></div><div><label style="font-size:16px;font-weight:700;color:#0f3d24">إلى الآية</label><input id="qt" type="number" inputmode="numeric" min="1" max="${max}" value="${max}" style="${inp}"></div></div>
+<button type="button" id="qall" style="border:1px solid #86b99a;background:#fff;color:#166534;border-radius:12px;padding:9px;font:inherit;font-size:15px;font-weight:700;cursor:pointer">إلى آخر السورة (${n2a(max)})</button>
+<button type="button" id="qsave" style="border:0;background:#166534;color:#fff;border-radius:14px;padding:13px;font:inherit;font-size:18px;font-weight:800;cursor:pointer">سجّل هذه القراءة</button><p id="qe" style="margin:0;color:#b91c1c;font-size:15px;font-weight:600"></p>
+<p style="margin:4px 0 0;font-size:16px;font-weight:700;color:#0f3d24">قراءة اليوم · ${n2a(tot)} آية</p>${list.length ? `<ul style="list-style:none;margin:0;padding:0;display:grid;gap:8px">${list.map(r => `<li style="display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid #d9e4d6;border-radius:12px;font-size:16px;font-weight:600;color:#14391f;background:#fff"><span style="flex:1">${esc(sName(r.surah))} · من ${n2a(r.from_ayah)} إلى ${n2a(r.to_ayah)}</span><button data-qd="${r.id}" style="border:1px solid #f1b4b4;background:#fff5f5;color:#b91c1c;border-radius:10px;padding:5px 10px;font:inherit;font-size:14px;cursor:pointer">حذف</button></li>`).join('')}</ul>` : '<p style="margin:0;font-size:15px;color:#33443a">لم تسجّل قراءة اليوم بعد.</p>'}</div>`;
+  const ss = document.getElementById('qs'), qf = document.getElementById('qf'), qt = document.getElementById('qt');
+  ss.onchange = () => { R.sel = { s: +ss.value, f: 1 }; qpPaint(); };
+  document.getElementById('qall').onclick = () => { qt.value = max; };
+  document.getElementById('qsave').onclick = async () => {
+    const f = Math.round(+qf.value), t = Math.round(+qt.value), e = document.getElementById('qe');
+    if (!(f >= 1 && t >= f && t <= max)) { e.textContent = 'تأكد أن الآية الأولى أقل من أو تساوي الأخيرة، ولا تزيد عن ' + n2a(max); return; }
+    const row = { tenant_id: TENANT, member_id: me.id, read_date: td, surah: cur.s, from_ayah: f, to_ayah: t };
+    const tmp = Object.assign({ id: 'tmp' + Date.now(), created_at: new Date().toISOString() }, row); reads.unshift(tmp); R.sel = { s: t >= max ? Math.min(114, cur.s + 1) : cur.s, f: t >= max ? 1 : t + 1 }; qpPaint();
+    try { const r = await ins('quran_reads', row); const real = Array.isArray(r) ? r[0] : r; if (real && real.id) { tmp.id = real.id; qpPaint(); } toast('تم الحفظ'); } catch (er) { const k = reads.indexOf(tmp); if (k >= 0) reads.splice(k, 1); qpPaint(); toast('تعذّر الحفظ: ' + errAr(er)); }
   };
-  ctx.qsel = null; paint();
+  box.querySelectorAll('[data-qd]').forEach(b => b.onclick = async () => { const id = b.dataset.qd, k = reads.findIndex(x => x.id === id); if (k >= 0) reads.splice(k, 1); qpPaint(); try { await del('quran_reads', 'id=eq.' + id); } catch (er) { toast('تعذّر الحذف'); } });
 }
 
 /* ---------- settings ---------- */
