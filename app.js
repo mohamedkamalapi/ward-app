@@ -370,6 +370,19 @@ aside.sticky nav a[class*="bg-primary-50"]{background:#f3c64a!important}
 aside.sticky nav a[class*="bg-primary-50"],aside.sticky nav a[class*="bg-primary-50"] *{color:#1b2a22!important}
 aside.sticky nav a[class*="bg-primary-50"] span.flex{background:rgba(0,0,0,.12)!important}
 aside.sticky nav a span.flex{background:rgba(255,255,255,.18)!important}
+html{font-size:15.5px}
+main h1{font-size:clamp(22px,5vw,29px)!important}
+main h2{font-size:18px!important}main h3{font-size:16px!important}
+.rp td{font-size:14.5px!important}.rp th{font-size:13.5px!important}
+@media(min-width:1024px){
+html{font-size:14px}
+main h1{font-size:25px!important}main h2{font-size:16.5px!important}main h3{font-size:14.5px!important}
+.sp header h1{font-size:22px!important}.sp h3{font-size:14.5px!important}
+.mt,.sp .mt,.rv .mt{font-size:12.5px!important}
+aside.sticky nav a{font-size:15px!important}
+.rp{font-size:13px!important}.rp td{font-size:13.5px!important}.rp th{font-size:12.5px!important}
+td.ok{font-size:16px!important}
+}
 .ra .muted{opacity:1;color:#33443a}
 .sp .l,.sp p{opacity:1!important}
 input,select,textarea{font-size:16px}
