@@ -319,6 +319,16 @@ body{background:#f6f3ec!important}
 .rp td:first-child{background:#f1f5ef!important;color:#2b4a3f!important;border-left:2px solid #dbe6dc!important;font-size:14.5px!important}
 .rp td.fr{box-shadow:inset 0 0 0 99px rgba(196,170,98,.10)}
 .rv,.rv .panel{border-radius:16px}
+
+.rp td{background:#fff!important}.rp tr:nth-child(even) td{background:#fbfaf6!important}
+td.no{background:#fff!important;color:#d2b3af!important;font-size:15px!important;font-weight:400!important}
+td.ok{background:#e4f0e7!important;color:#3a7a56!important;font-weight:800!important;font-size:18px!important}
+td.na{background:#f1f1ec!important}
+.rp td:first-child{background:#f1f5ef!important}
+.hubw{background:#f7f0dc!important;border:1.5px solid #e4d6a8!important;border-radius:18px!important;padding:16px!important}
+.hubw h2{color:#6b4a14!important}.hubw .mt{color:#6b5a30!important}
+.hubw a{border-color:#e4d6a8!important}
+.hubw a span:first-child{background:#f3e5b8!important;color:#8a5f12!important}
 main h1{font-size:clamp(24px,5.2vw,34px)!important;font-weight:800!important;line-height:1.35!important}
 main h2{font-size:20px!important;font-weight:700!important}
 main h3{font-size:17px!important;font-weight:700!important}
@@ -399,6 +409,17 @@ function draw(inner) {
   try { const a = $app.querySelector('nav.fixed li a.text-primary-700'); if (a) a.scrollIntoView({ inline: 'center', block: 'nearest' }); } catch (e) { }
   bellOpen = false;
 }
+function addBack() {
+  const r = (location.hash.replace(/^#/, '') || '/').split('?')[0], m = document.querySelector('main'); if (!m || document.getElementById('bk')) return;
+  const inner = ['/more', '/reminders', '/install', '/ward/history'].includes(r) || (r.startsWith('/sheikh/') && r !== '/sheikh/reports') || (r === '/sheikh/reports');
+  if (!inner) return;
+  const up = r === '/more' || r === '/reminders' || r === '/install' ? '/settings' : r === '/ward/history' ? '/ward' : r.startsWith('/sheikh/member/') ? '/sheikh/members' : '/sheikh';
+  const b = document.createElement('button'); b.id = 'bk'; b.type = 'button'; b.innerHTML = '<i class="ri-arrow-right-line" style="font-size:22px"></i><span>رجوع</span>';
+  b.style.cssText = 'display:inline-flex;align-items:center;gap:6px;margin:0 0 10px;padding:9px 16px;border:1.5px solid #cddfd3;background:#fff;color:#2b4a3f;border-radius:999px;font:inherit;font-size:16px;font-weight:700;cursor:pointer';
+  b.onclick = () => { go(up); render(); };
+  m.insertBefore(b, m.firstChild);
+}
+new MutationObserver(() => addBack()).observe(document.getElementById('app') || document.body, { childList: true, subtree: false });
 document.addEventListener('click', e => {
   const p = document.getElementById('bellp'); if (!p) return;
   const hit = id => e.target.closest && e.target.closest('#' + id);
@@ -908,7 +929,7 @@ async function viewWirdMgmt(editId) {
 }
 
 const hubTile = (h, ic, t, sub) => `<a href="#${h}" style="display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;padding:16px 8px;border:1.5px solid #d3e2d9;border-radius:16px;background:#fff;text-decoration:none;color:#2b4a3f"><span style="width:52px;height:52px;border-radius:14px;background:#edf3ee;color:#4a7766;display:flex;align-items:center;justify-content:center;font-size:27px"><i class="${ic}"></i></span><b style="font-size:17px">${t}</b><span style="font-size:13.5px;color:#33443a;line-height:1.5">${sub}</span></a>`;
-function hubGrid() { return `<section class="panel"><h2 style="margin:0 0 4px;font-size:21px;color:#2b4a3f">الإدارة والبناء</h2><p class="mt" style="margin:0 0 12px">كل التعديلات في مكان واحد. اضغط على ما تريد تعديله.</p><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">${hubTile('/sheikh/stages', 'ri-stairs-line', 'المراحل', 'أوراد كل مرحلة وأهدافها')}${me.role === 'supervisor' ? '' : hubTile('/sheikh/wird', 'ri-list-check-2', 'الأوراد', 'إضافة وتعديل الأوراد')}${hubTile('/sheikh/members', 'ri-team-line', 'الأعضاء', 'بيانات الأعضاء وملاحظاتهم')}${hubTile('/sheikh/roster', 'ri-group-2-line', 'المجموعات', 'الحلقات والأسر')}${hubTile('/sheikh/requests', 'ri-user-add-line', 'الطلبات', 'طلبات الانضمام')}${hubTile('/sheikh/promotions', 'ri-medal-line', 'الترقيات', 'ترقية الأعضاء بين المراحل')}${hubTile('/sheikh/reports', 'ri-table-line', 'الجداول', 'متابعة الأعضاء والتقارير')}</div></section>`; }
+function hubGrid() { return `<section class="panel hubw"><h2 style="margin:0 0 4px;font-size:21px;color:#2b4a3f">الإدارة والبناء</h2><p class="mt" style="margin:0 0 12px">كل التعديلات في مكان واحد. اضغط على ما تريد تعديله.</p><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">${hubTile('/sheikh/stages', 'ri-stairs-line', 'المراحل', 'أوراد كل مرحلة وأهدافها')}${me.role === 'supervisor' ? '' : hubTile('/sheikh/wird', 'ri-list-check-2', 'الأوراد', 'إضافة وتعديل الأوراد')}${hubTile('/sheikh/members', 'ri-team-line', 'الأعضاء', 'بيانات الأعضاء وملاحظاتهم')}${hubTile('/sheikh/roster', 'ri-group-2-line', 'المجموعات', 'الحلقات والأسر')}${hubTile('/sheikh/requests', 'ri-user-add-line', 'الطلبات', 'طلبات الانضمام')}${hubTile('/sheikh/promotions', 'ri-medal-line', 'الترقيات', 'ترقية الأعضاء بين المراحل')}${hubTile('/sheikh/reports', 'ri-table-line', 'الجداول', 'متابعة الأعضاء والتقارير')}</div></section>`; }
 async function viewSheikh() {
   const [members, reqs, acts, logs] = await Promise.all([
     q('profiles', 'select=id,full_name,last_active_at,group_id,stage_id&role=eq.member&status=eq.active'),
