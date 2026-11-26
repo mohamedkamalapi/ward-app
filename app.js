@@ -127,10 +127,19 @@ async function loadMe() {
   try {
     const r = await q('profiles', 'select=*&id=eq.' + S.uid);
     me = r[0] || null;
+    if (me && (me.role === 'sheikh' || me.role === 'super_admin')) { me.real_role = me.role; const pv = localStorage.getItem('prev_role'); if (pv === 'sheikh' || pv === 'supervisor' || pv === 'member') me.role = pv; }
     if (me) rpc('touch_last_active').catch(() => { });
   } catch (e) { if (e.status === 401) { saveS(null); } me = null; }
 }
 
+function previewChip() {
+  let el = document.getElementById('pvc');
+  if (!me || !me.real_role) { if (el) el.remove(); return; }
+  if (!el) { el = document.createElement('div'); el.id = 'pvc'; el.style.cssText = 'position:fixed;left:8px;bottom:78px;z-index:60;background:#fff8e1;border:1px solid #e0b84a;border-radius:10px;padding:4px 8px;font-size:11px;box-shadow:0 2px 8px rgba(0,0,0,.15);display:flex;gap:6px;align-items:center;direction:rtl'; document.body.appendChild(el); }
+  const cur = localStorage.getItem('prev_role') || '';
+  el.innerHTML = `<span>معاينة كـ</span><select id="pvs" style="font:inherit;font-size:11px;border:1px solid #d9c27a;border-radius:6px;background:#fff"><option value="">حسابي (${me.real_role === 'super_admin' ? 'مدير' : 'شيخ'})</option><option value="sheikh" ${cur === 'sheikh' ? 'selected' : ''}>شيخ</option><option value="supervisor" ${cur === 'supervisor' ? 'selected' : ''}>مشرف</option><option value="member" ${cur === 'member' ? 'selected' : ''}>عضو</option></select>`;
+  el.querySelector('#pvs').onchange = e => { if (e.target.value) localStorage.setItem('prev_role', e.target.value); else localStorage.removeItem('prev_role'); me = null; go('/'); render(); };
+}
 async function render() {
   const p = (location.hash.slice(1) || '/');
   route = p.split('?')[0];
@@ -138,6 +147,7 @@ async function render() {
   if (!me) { await loadMe(); }
   if (!S) return viewWelcome();
   if (!me) return viewComplete();
+  previewChip();
   if (me.status !== 'active') return viewPending();
   try {
     if (route === '/') return await viewHome();
