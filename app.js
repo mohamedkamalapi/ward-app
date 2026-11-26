@@ -93,7 +93,7 @@ async function viewReminders() {
       toast('تم التفعيل'); render();
     } catch (e) { toast('تعذّر التفعيل: ' + e.message); }
   };
-  const tb = document.getElementById('pusht'); if (tb) tb.onclick = async () => { const reg = await navigator.serviceWorker.ready; reg.showNotification('تجربة التذكير', { body: 'الإشعارات تعمل على هذا الجهاز.', icon: 'icon-192.png', dir: 'rtl', lang: 'ar' }); };
+  const tb = document.getElementById('pusht'); if (tb) tb.onclick = async () => { const reg = await navigator.serviceWorker.ready; reg.showNotification('تجربة التذكير', { body: 'الإشعارات تعمل على هذا الجهاز.', icon: 'icon-192-v3.png', dir: 'rtl', lang: 'ar' }); };
   document.querySelectorAll('[data-k]').forEach(b => b.onclick = async () => {
     prefs[b.dataset.k] = !prefs[b.dataset.k];
     try { await api('/rest/v1/reminder_prefs?on_conflict=user_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates' }, body: { user_id: S.uid, wird: prefs.wird, prayers: prefs.prayers, monthu: prefs.monthu, whitedays: prefs.whitedays } }); } catch (e) { toast('تعذّر الحفظ'); }
