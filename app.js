@@ -909,7 +909,8 @@ const RPCSS = `<style>
 </style>`;
 async function viewReports(st) {
   st = st || window.__rp || { mode: 'member', member: '', days: 'm' }; window.__rp = st;
-  const [members, acts0, swRows] = await Promise.all([q('profiles', 'select=id,full_name,stage_id&role=eq.member&status=eq.active&order=full_name'), q('wird_activities', 'select=*&is_active=eq.true&order=order_index.asc'), q('stage_wird', 'select=*&limit=2000')]);
+  let [members, acts0, swRows] = await Promise.all([q('profiles', 'select=id,full_name,stage_id,role&status=eq.active&order=full_name'), q('wird_activities', 'select=*&is_active=eq.true&order=order_index.asc'), q('stage_wird', 'select=*&limit=2000')]);
+  { const only = members.filter(m => m.role === 'member'); if (only.length) members = only; }
   const FR = 'وليمة الجمعة';
   const mainActs = acts0.filter(a => a.grp !== FR), friActs = acts0.filter(a => a.grp === FR);
   const sw = {}; swRows.forEach(r => sw[r.stage_id + '|' + r.activity_id] = r);
