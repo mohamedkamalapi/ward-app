@@ -343,6 +343,33 @@ main h2{font-size:20px!important;font-weight:700!important}
 main h3{font-size:17px!important;font-weight:700!important}
 .sp header h1{font-size:26px!important}.sp h3{font-size:17px!important}
 .mt,.sp .mt,.rv .mt{opacity:1!important;color:#33443a!important;font-size:13.5px!important}
+body{background:#f1ede1!important}
+.bg-primary-800{background-color:#0f5a43!important}.bg-primary-700{background-color:#146b50!important}.bg-primary-600,.bg-primary-500{background-color:#1a7a5a!important}
+.border-primary-800{border-color:#0f5a43!important}
+.pattern-emerald{background:linear-gradient(160deg,#0f6a4e,#0a4a37)!important}
+.text-primary-700,.text-primary-800{color:#0b4a37!important}
+.bg-accent-50,.bg-accent-100{background-color:#fbecbd!important}
+.border-accent-300,.border-accent-200{border-color:#d9b84e!important}
+main .rounded-2xl,main .rounded-xl,main .rounded-lg{border-color:#c9d6cc!important}
+main .bg-white{border-color:#c4d3c8!important}
+main svg{stroke-width:2.2}
+td.ok{background:#bfe8cb!important;color:#0b6b35!important}
+td.no{background:#fbd9d6!important;color:#b3261e!important;font-weight:800!important}
+td.na{background:#e6e6de!important}
+.rp th{background:#bcd6c6!important;color:#0b3d2e!important}.rp th.g,.rp th:first-child{background:#9fc4ae!important}
+.rp thead tr:nth-child(2) th{background:#d3e6da!important}
+.rp td:first-child{background:#dfece3!important;color:#0b3d2e!important}
+.hubw{background:#fbecbd!important;border:2px solid #d9b84e!important}
+.hubw h2{color:#5a3a00!important}.hubw a span:first-child{background:#f3d77e!important;color:#6b4300!important}
+.mt,.sp .mt,.rv .mt{color:#1f2f27!important}
+aside.sticky{background:#0f4a39!important}
+aside.sticky,aside.sticky *{color:#ffffff!important}
+aside.sticky .text-foreground-400,aside.sticky p{color:#e3f1ea!important}
+aside.sticky nav a{font-size:17.5px!important;font-weight:700!important}
+aside.sticky nav a[class*="bg-primary-50"]{background:#f3c64a!important}
+aside.sticky nav a[class*="bg-primary-50"],aside.sticky nav a[class*="bg-primary-50"] *{color:#1b2a22!important}
+aside.sticky nav a[class*="bg-primary-50"] span.flex{background:rgba(0,0,0,.12)!important}
+aside.sticky nav a span.flex{background:rgba(255,255,255,.18)!important}
 .ra .muted{opacity:1;color:#33443a}
 .sp .l,.sp p{opacity:1!important}
 input,select,textarea{font-size:16px}
