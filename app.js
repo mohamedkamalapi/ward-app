@@ -288,6 +288,10 @@ async function viewPending() {
 const THEMES = [['green', 'أخضر هادئ', 0], ['blue', 'أزرق هادئ', 62], ['lav', 'بنفسجي هادئ', 125], ['sand', 'رملي دافئ', -95]];
 function applyTheme() { const t = THEMES.find(x => x[0] === localStorage.getItem('theme')) || THEMES[0]; document.documentElement.style.filter = t[2] ? `hue-rotate(${t[2]}deg) saturate(.92)` : ''; }
 applyTheme();
+const FONTS = [['noto', 'Noto Sans Arabic', 'نوتو سانس · واضح ومريح'], ['almarai', 'Almarai', 'المرعي · حديث وبسيط'], ['tajawal', 'Tajawal', 'تجوّل · خفيف ومرتب'], ['plex', 'IBM Plex Sans Arabic', 'آي بي إم · رسمي وواضح']];
+function fontStack(k) { const f = FONTS.find(x => x[0] === k) || FONTS[0]; return `"${f[1]}", "Noto Sans Arabic", system-ui, sans-serif`; }
+function applyFont() { const k = localStorage.getItem('font') || 'noto'; const st = fontStack(k); const r = document.documentElement.style; r.setProperty('--font-body', st); r.setProperty('--font-heading', st); r.setProperty('--font-label', st); }
+applyFont();
 (function () { const st = document.createElement('style'); st.textContent = `
 body{font-size:16px;line-height:1.65}
 .text-foreground-400,.text-foreground-500,.text-foreground-600{color:oklch(var(--foreground-800))!important}
@@ -785,10 +789,12 @@ async function viewSettings() {
   draw(wrapS(`<div style="display:grid;gap:14px"><div><h1 style="margin:0;color:#2b4a3f">الإعدادات</h1><p style="margin:4px 0 0;font-size:16px;color:#33443a">${esc(me.full_name)} · ${esc(me.email || '')} · ${ROLE_AR[me.real_role || me.role] || ''}</p></div>
 ${me.real_role ? `<section class="rounded-lg border border-accent-300 bg-accent-50 p-4"><h2 style="margin:0;color:#3d2a00">معاينة التطبيق (للمالك فقط)</h2><p style="margin:4px 0 10px;font-size:15px;color:#4a3600">اعرض التطبيق كما يراه الشيخ أو المشرف أو العضو. صلاحياتك الفعلية لا تتغيّر.</p><div style="display:flex;gap:8px;flex-wrap:wrap">${seg('', 'حسابي')}${seg('sheikh', 'شيخ')}${seg('supervisor', 'مشرف')}${seg('member', 'عضو')}</div></section>` : ''}
 <section class="rounded-lg border border-background-300 bg-background-50 p-4"><h2 style="margin:0;color:#2b4a3f">ألوان التطبيق</h2><p style="margin:4px 0 10px;font-size:15px;color:#33443a">اختر اللون الذي يريح عينك. الأخضر الهادئ هو الافتراضي.</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${THEMES.map(t => `<button type="button" data-th="${t[0]}" style="border:2px solid ${(localStorage.getItem('theme') || 'green') === t[0] ? '#4a7766' : '#d3e2d9'};background:#fff;border-radius:14px;padding:12px;font:inherit;font-size:16px;font-weight:700;color:#2b4a3f;cursor:pointer;display:flex;align-items:center;gap:8px;justify-content:center"><span style="width:18px;height:18px;border-radius:50%;background:#4a7766;filter:hue-rotate(${t[2]}deg)"></span>${t[1]}</button>`).join('')}</div></section>
+<section class="rounded-lg border border-background-300 bg-background-50 p-4"><h2 style="margin:0;color:#2b4a3f">الخط</h2><p style="margin:4px 0 10px;font-size:15px;color:#33443a">اختر الخط الأوضح لعينك، ويتغيّر فورًا. الافتراضي نوتو سانس.</p><div style="display:grid;gap:8px">${FONTS.map(f => `<button type="button" data-fn="${f[0]}" style="border:2px solid ${(localStorage.getItem('font') || 'noto') === f[0] ? '#4a7766' : '#d3e2d9'};background:#fff;border-radius:14px;padding:12px 14px;font-family:${fontStack(f[0])};font-size:17px;font-weight:700;color:#2b4a3f;cursor:pointer;text-align:right;line-height:1.5">${f[2]}<br><span style="font-weight:400;font-size:15px">سبحان الله وبحمده · ١٢٣٤٥ · وردي اليوم</span></button>`).join('')}</div></section>
 <div style="display:grid;gap:10px">${row('#/more', 'ri-user-3-line', 'حسابي', 'بيانات الحساب والمرحلة والحلقة')}${row('#/reminders', 'ri-notification-3-line', 'الإشعارات والتذكيرات', 'مواقيت الأذكار والأيام البيض وغيرها')}${row('#/install', 'ri-smartphone-line', 'تثبيت التطبيق', 'إضافته إلى الشاشة الرئيسية')}${row('#/ward/history', 'ri-calendar-2-line', 'سجل الشهر', 'ما سجّلته في الأيام السابقة')}</div>
 <button type="button" id="lo2" style="border:1.5px solid #d3e2d9;background:#fff;color:#3b6556;border-radius:14px;padding:14px;font:inherit;font-size:17px;font-weight:700;cursor:pointer">تسجيل الخروج</button></div>`));
   document.getElementById('lo2').onclick = logout;
   document.querySelectorAll('[data-th]').forEach(b => b.onclick = () => { localStorage.setItem('theme', b.dataset.th); applyTheme(); viewSettings(); });
+  document.querySelectorAll('[data-fn]').forEach(b => b.onclick = () => { localStorage.setItem('font', b.dataset.fn); applyFont(); viewSettings(); });
 }
 
 /* ---------- stage editor ---------- */
