@@ -327,6 +327,17 @@ td.na{background:#f1f1ec!important}
 .hubw h2{color:#6b4a14!important}.hubw .mt{color:#6b5a30!important}
 .hubw a{border-color:#e4d6a8!important}
 .hubw a span:first-child{background:#f3e5b8!important;color:#8a5f12!important}
+
+aside.sticky{background:#2f4f43!important;border-left:0!important;box-shadow:-6px 0 24px rgba(30,50,42,.18)}
+aside.sticky,aside.sticky *{color:#eef4f0!important}
+aside.sticky .text-foreground-400,aside.sticky p{color:#cfe0d6!important}
+aside.sticky nav a{font-size:16.5px!important;font-weight:600!important;background:transparent!important}
+aside.sticky nav a:hover{background:rgba(255,255,255,.10)!important}
+aside.sticky nav a[class*="bg-primary-50"]{background:rgba(255,255,255,.20)!important}
+aside.sticky nav a span.flex{background:rgba(255,255,255,.12)!important}
+aside.sticky nav a[class*="bg-primary-50"] span.flex{background:rgba(255,255,255,.26)!important}
+aside.sticky a>span.bg-primary-700{background:#e9f1ec!important}aside.sticky a>span.bg-primary-700{color:#2f4f43!important}
+aside.sticky .rounded-lg.border{background:rgba(255,255,255,.10)!important;border-color:rgba(255,255,255,.22)!important}
 main h1{font-size:clamp(24px,5.2vw,34px)!important;font-weight:800!important;line-height:1.35!important}
 main h2{font-size:20px!important;font-weight:700!important}
 main h3{font-size:17px!important;font-weight:700!important}
