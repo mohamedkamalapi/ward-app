@@ -132,14 +132,21 @@ async function loadMe() {
   } catch (e) { if (e.status === 401) { saveS(null); } me = null; }
 }
 
-function previewChip() {
-  let el = document.getElementById('pvc');
-  if (!me || !me.real_role) { if (el) el.remove(); return; }
-  if (!el) { el = document.createElement('div'); el.id = 'pvc'; el.style.cssText = 'position:fixed;left:8px;bottom:78px;z-index:60;background:#fff8e1;border:1px solid #e0b84a;border-radius:10px;padding:4px 8px;font-size:11px;box-shadow:0 2px 8px rgba(0,0,0,.15);display:flex;gap:6px;align-items:center;direction:rtl'; document.body.appendChild(el); }
-  const cur = localStorage.getItem('prev_role') || '';
-  el.innerHTML = `<span>معاينة كـ</span><select id="pvs" style="font:inherit;font-size:11px;border:1px solid #d9c27a;border-radius:6px;background:#fff"><option value="">حسابي (${me.real_role === 'super_admin' ? 'مدير' : 'شيخ'})</option><option value="sheikh" ${cur === 'sheikh' ? 'selected' : ''}>شيخ</option><option value="supervisor" ${cur === 'supervisor' ? 'selected' : ''}>مشرف</option><option value="member" ${cur === 'member' ? 'selected' : ''}>عضو</option></select>`;
-  el.querySelector('#pvs').onchange = e => { if (e.target.value) localStorage.setItem('prev_role', e.target.value); else localStorage.removeItem('prev_role'); me = null; go('/'); render(); };
+function previewChip() { const el = document.getElementById('pvc'); if (el) el.remove(); }
+const ROLE_AR = { sheikh: 'شيخ', supervisor: 'مشرف', member: 'عضو', super_admin: 'مدير' };
+function setPreview(v) { if (v) localStorage.setItem('prev_role', v); else localStorage.removeItem('prev_role'); me = null; go('/'); render(); }
+function roleBadge() {
+  if (!me) return '';
+  if (!me.real_role) return `<span class="inline-flex items-center gap-1.5 rounded-full border border-primary-300 bg-primary-50 px-3 py-1.5 text-[12px] font-semibold text-primary-800"><i class="ri-user-3-line text-[13px]"></i>${ROLE_AR[me.role] || 'عضو'}</span>`;
+  const prev = localStorage.getItem('prev_role') || '', opt = (v, t, ic) => `<button type="button" data-pv="${v}" style="display:flex;width:100%;align-items:center;gap:10px;padding:10px 12px;border:0;background:${prev === v ? '#e7f4ec' : 'transparent'};border-radius:10px;font:inherit;font-size:14px;font-weight:${prev === v ? 700 : 500};color:#14391f;cursor:pointer;text-align:right"><i class="${ic}" style="font-size:17px;color:#166534"></i><span style="flex:1">${t}</span>${prev === v ? '<i class="ri-check-line" style="color:#166534"></i>' : ''}</button>`;
+  return `<div class="relative"><button type="button" id="rb" style="display:flex;align-items:center;gap:6px;border:1px solid #bcd9c6;background:#f0f8f2;color:#14532d;border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;font-weight:700;cursor:pointer"><i class="ri-user-star-line" style="font-size:15px"></i><span>${ROLE_AR[me.role]}${prev ? ' (معاينة)' : ''}</span><i class="ri-arrow-down-s-line" style="font-size:15px"></i></button><div id="rbp" style="display:none;position:absolute;left:0;top:calc(100% + 8px);width:230px;background:#fff;border:1px solid #d9e4d6;border-radius:14px;box-shadow:0 12px 30px rgba(15,60,35,.18);padding:6px;z-index:70"><p style="margin:6px 10px 4px;font-size:12px;color:#4b5b50;font-weight:600">عرض التطبيق كـ</p>${opt('', 'حسابي (' + ROLE_AR[me.real_role] + ')', 'ri-shield-user-line')}${opt('sheikh', 'شيخ', 'ri-user-star-line')}${opt('supervisor', 'مشرف', 'ri-user-settings-line')}${opt('member', 'عضو', 'ri-user-line')}<p style="margin:6px 10px 6px;font-size:11.5px;color:#5b6b60;line-height:1.6">المعاينة تغيّر شكل الشاشات فقط، وصلاحياتك الفعلية لا تتغيّر.</p></div></div>`;
 }
+document.addEventListener('click', e => {
+  const p = document.getElementById('rbp'); if (!p) return;
+  const o = e.target.closest && e.target.closest('[data-pv]'); if (o) { p.style.display = 'none'; return setPreview(o.dataset.pv); }
+  if (e.target.closest && e.target.closest('#rb')) { p.style.display = p.style.display === 'block' ? 'none' : 'block'; return; }
+  p.style.display = 'none';
+});
 async function render() {
   const p = (location.hash.slice(1) || '/');
   route = p.split('?')[0];
@@ -154,6 +161,8 @@ async function render() {
     if (route === '/ward') return await viewWard();
     if (route === '/ward/history') return await viewHistory();
     if (route === '/more') return await viewMore();
+    if (route === '/settings') return await viewSettings();
+    if (route === '/quran') return await viewQuran();
     if (route === '/progress') return await viewStatic('progress');
     if (route === '/seasons') return await viewStatic('seasons');
     if (route.startsWith('/seasons/')) return await viewStatic('season');
@@ -168,6 +177,7 @@ async function render() {
       if (route === '/sheikh/reports') return await viewReports();
       if (route === '/sheikh/requests') return await viewRequests();
       if (route === '/sheikh/promotions') return await viewPromotions();
+      if (route === '/sheikh/stages') return await viewStages();
       if (route === '/sheikh/wird') return me.role === 'supervisor' ? go('/sheikh') : await viewWirdMgmt();
     }
     return go('/');
@@ -275,6 +285,27 @@ async function viewPending() {
   document.getElementById('cs').onclick = async () => { try { await rpc('claim_sheikh_role'); me = null; await loadMe(); toast('تم تفعيل صلاحية الشيخ'); go('/sheikh'); render(); } catch (e) { document.getElementById('e').textContent = errAr(e); } };
 }
 
+(function () { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap'; document.head.appendChild(l); const st = document.createElement('style'); st.textContent = `
+:root{--font-body:"Cairo",system-ui,sans-serif;--font-heading:"Cairo",system-ui,sans-serif;--font-label:"Cairo",system-ui,sans-serif}
+html,body,button,input,select,textarea{font-family:"Cairo",system-ui,sans-serif}
+body{font-size:16px;line-height:1.65}
+.text-foreground-400,.text-foreground-500,.text-foreground-600{color:oklch(var(--foreground-800))!important}
+.text-foreground-700,.text-foreground-800{color:oklch(var(--foreground-950))!important}
+[class*="text-[9"],[class*="text-[10"]{font-size:13px!important}
+[class*="text-[11"]{font-size:13.5px!important}
+[class*="text-[12"]{font-size:14.5px!important}
+[class*="text-[13"]{font-size:15.5px!important}
+[class*="text-[14"],[class*="text-[15"]{font-size:17px!important}
+main h1{font-size:clamp(24px,5.2vw,34px)!important;font-weight:800!important;line-height:1.35!important}
+main h2{font-size:20px!important;font-weight:700!important}
+main h3{font-size:17px!important;font-weight:700!important}
+.sp header h1{font-size:26px!important}.sp h3{font-size:17px!important}
+.mt,.sp .mt,.rv .mt{opacity:1!important;color:#33443a!important;font-size:13.5px!important}
+.ra .muted{opacity:1;color:#33443a}
+.sp .l,.sp p{opacity:1!important}
+input,select,textarea{font-size:16px}
+.no-scrollbar::-webkit-scrollbar{display:none}.no-scrollbar{scrollbar-width:none}
+`; document.head.appendChild(st); })();
 /* ---------- data shared ---------- */
 async function loadActivities() { return await q('wird_activities', 'select=*&is_active=eq.true&order=order_index.asc,created_at.asc'); }
 async function loadMyActs() {
@@ -300,6 +331,7 @@ function actState(a, day) {
   const log = day.logs.find(l => l.activity_id === a.id);
   if (a.type === 'toggle') return { done: !!(log && log.completed), val: 0, total: 1 };
   if (a.type === 'counter' && a.max_val != null) { const v = log ? +log.counter_value : 0; return { done: v > 0 && v <= a.max_val && (a.min_val == null || v >= a.min_val), val: v, total: a.max_val, sleep: true }; }
+  if (a.type === 'counter' && (a.target_count || 0) >= 100) { const v = log ? +log.counter_value : 0, t = a.target_count; return { done: v >= t, val: v, total: t, typed: true }; }
   if (a.type === 'counter') { const v = log ? log.counter_value : 0, t = a.target_count || 1; return { done: v >= t, val: v, total: t }; }
   const n = a.quran_parts || 1, got = day.parts.filter(p => p.activity_id === a.id).map(p => p.part_index); return { done: got.length >= n, val: got.length, total: n, got };
 }
@@ -308,8 +340,12 @@ async function setLog(a, completed, counter) {
 }
 
 /* ---------- Readdy-style shell & member views ---------- */
-const NAV = [['/', 'ri-home-line', 'الرئيسية'], ['/ward', 'ri-checkbox-circle-line', 'وردي'], ['/progress', 'ri-line-chart-line', 'تقدمي'], ['/seasons', 'ri-calendar-line', 'المواسم'], ['/group', 'ri-group-line', 'مجموعتي'], ['/more', 'ri-menu-line', 'المزيد']];
-const navOn = (r, p) => p === '/' ? r === '/' : (r === p || r.startsWith(p + '/') || (p === '/more' && r.startsWith('/sheikh')) || (p === '/ward' && r === '/ward/history'));
+function navItems() {
+  const b = [['/', 'ri-home-4-line', 'الرئيسية'], ['/ward', 'ri-checkbox-circle-line', 'وردي'], ['/quran', 'ri-book-open-line', 'القرآن'], ['/progress', 'ri-line-chart-line', 'تقدمي'], ['/seasons', 'ri-calendar-line', 'المواسم'], ['/group', 'ri-group-line', 'مجموعتي']];
+  const st = isStaff() ? [['/sheikh', 'ri-dashboard-line', 'لوحة الشيخ'], ['/sheikh/reports', 'ri-table-line', 'الجداول'], ['/sheikh/stages', 'ri-stairs-line', 'المراحل'], ['/sheikh/members', 'ri-team-line', 'الأعضاء'], ['/sheikh/roster', 'ri-group-2-line', 'المجموعات']].concat(me.role === 'supervisor' ? [] : [['/sheikh/wird', 'ri-list-check-2', 'الأوراد']]).concat([['/sheikh/requests', 'ri-user-add-line', 'الطلبات'], ['/sheikh/promotions', 'ri-medal-line', 'الترقيات']]) : [];
+  return b.concat(st, [['/settings', 'ri-settings-3-line', 'الإعدادات']]);
+}
+const navOn = (r, p) => p === '/' ? r === '/' : p === '/sheikh' ? r === '/sheikh' : p === '/settings' ? ['/settings', '/more', '/reminders', '/install'].includes(r) : (r === p || r.startsWith(p + '/') || (p === '/ward' && r === '/ward/history') || (p === '/sheikh/members' && r.startsWith('/sheikh/member/')));
 const fG = new Intl.DateTimeFormat('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 const fH = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', { day: 'numeric', month: 'long', year: 'numeric' });
 const fW = new Intl.DateTimeFormat('ar-EG', { weekday: 'long' });
@@ -317,9 +353,9 @@ let lastStreak = 0, bellOpen = false;
 const NOTIFS = [['ri-trophy-line', 'bg-accent-100 text-accent-800', 'أنت مؤهل للانتقال إلى المرحلة الأولى', 'استوفيت شروط المرحلة التمهيدية، وبانتظار اعتماد الشيخ.', 'قبل ساعة', 1], ['ri-calendar-line', 'bg-primary-100 text-primary-800', 'بقي ٩ أيام على انتهاء موسم الست من شوال', 'أكملت ٤ أيام من ٦، وترتيبك الرابع في المجموعة.', 'قبل ٣ ساعات', 1], ['ri-notification-3-line', 'bg-secondary-100 text-secondary-800', 'إعلان جديد من شيخك', 'مجلس التربية الأسبوعي مساء الخميس بعد العشاء.', 'أمس', 1], ['ri-time-line', 'bg-background-200 text-foreground-700', 'تذكير بورد اليوم', 'لم تُسجّل أذكار المساء بعد. الورد بانتظارك.', 'أمس', 0]];
 function shell(inner, opts = {}) {
   const r = route, d = new Date(), init = esc((me.full_name || 'م').trim()[0] || 'م');
-  const nl = (c) => NAV.map(([p, i, l]) => c(p, i, l, navOn(r, p)));
+  const nl = (c) => navItems().map(([p, i, l]) => c(p, i, l, navOn(r, p)));
   const side = nl((p, i, l, on) => `<li><a class="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors duration-smooth ${on ? 'bg-primary-50 font-medium text-primary-800' : 'text-foreground-700 hover:bg-background-100 hover:text-foreground-900'}" href="#${p}"><span class="flex h-8 w-8 items-center justify-center rounded-md ${on ? 'bg-primary-100 text-primary-700' : 'bg-background-100 text-foreground-500'}"><i class="${i} text-base"></i></span><span class="whitespace-nowrap">${l}</span>${on ? '<span class="mr-auto h-1.5 w-1.5 rounded-full bg-accent-500"></span>' : ''}</a></li>`).join('');
-  const bot = nl((p, i, l, on) => `<li class="min-w-0"><a class="group flex cursor-pointer flex-col items-center gap-0.5 rounded-md px-1 py-1.5 transition-colors duration-smooth ${on ? 'text-primary-700' : 'text-foreground-500 hover:text-primary-600'}" href="#${p}"><span class="flex h-8 w-8 items-center justify-center rounded-md transition-colors duration-smooth ${on ? 'bg-primary-100' : 'bg-transparent group-hover:bg-background-200'}"><i class="${i} text-[17px] leading-none"></i></span><span class="whitespace-nowrap text-[10px] font-medium leading-tight">${l}</span></a></li>`).join('');
+  const bot = nl((p, i, l, on) => `<li class="min-w-[68px] flex-1 shrink-0"><a class="group flex cursor-pointer flex-col items-center gap-0.5 rounded-md px-1 py-1.5 transition-colors duration-smooth ${on ? 'text-primary-700' : 'text-foreground-500 hover:text-primary-600'}" href="#${p}"><span class="flex h-8 w-8 items-center justify-center rounded-md transition-colors duration-smooth ${on ? 'bg-primary-100' : 'bg-transparent group-hover:bg-background-200'}"><i class="${i} text-[17px] leading-none"></i></span><span class="whitespace-nowrap text-[11px] font-semibold leading-tight">${l}</span></a></li>`).join('');
   const notes = NOTIFS.map(([ic, cl, t, s, w, u]) => `<li class="flex gap-3 px-4 py-3 transition-colors duration-smooth hover:bg-background-100"><span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${cl}"><i class="${ic} text-sm"></i></span><div class="min-w-0 flex-1"><div class="flex items-start justify-between gap-2"><p class="text-[13px] font-medium leading-snug text-foreground-900">${t}</p>${u ? '<span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary-500"></span>' : ''}</div><p class="mt-0.5 text-[11px] leading-relaxed text-foreground-600">${s}</p><p class="mt-1 text-[10px] text-foreground-400">${w}</p></div></li>`).join('');
   const sub = (me.group_name || 'بدون حلقة');
   return `<div class="min-h-[100dvh] w-full overflow-x-clip bg-background-100"><div class="mx-auto flex w-full max-w-[1600px]">
@@ -328,15 +364,16 @@ function shell(inner, opts = {}) {
 <div class="space-y-3 px-4 pb-5">${lastStreak > 0 ? `<div class="rounded-lg border border-accent-200/80 bg-accent-50 p-3.5"><div class="flex items-center gap-2 text-accent-800"><span class="flex h-6 w-6 items-center justify-center"><i class="ri-fire-line text-base"></i></span><p class="text-xs font-semibold">${lastStreak} يومًا متتاليًا</p></div><p class="mt-1.5 text-[11px] leading-relaxed text-accent-900/80">استمر على وردك اليومي، فالقليل الدائم خير من الكثير المنقطع.</p></div>` : ''}
 <a class="flex cursor-pointer items-center gap-3 rounded-lg border border-background-200 bg-background-50 p-3 transition-colors duration-smooth hover:bg-background-100" href="#/more"><span class="flex h-9 w-9 items-center justify-center rounded-full bg-primary-100 font-heading text-sm font-semibold text-primary-800">${init}</span><span class="min-w-0 flex-1"><span class="block truncate text-[13px] font-medium text-foreground-900">${esc(me.full_name)}</span><span class="block truncate text-[11px] text-foreground-500">${esc(sub)}</span></span><span class="flex h-6 w-6 items-center justify-center text-foreground-400"><i class="ri-arrow-left-s-line text-base"></i></span></a></div></aside>
 <div class="flex min-h-[100dvh] w-full min-w-0 flex-1 flex-col"><header class="sticky top-0 z-30 border-b border-background-200 bg-background-100/90 backdrop-blur-md"><div class="mx-auto flex w-full max-w-[1180px] items-center justify-between gap-3 px-4 py-3 md:px-8"><div class="flex min-w-0 items-center gap-2.5"><a class="flex cursor-pointer items-center gap-2 lg:hidden" href="#/"><span class="flex h-8 w-8 items-center justify-center rounded-md bg-primary-700 font-heading text-[11px] font-semibold text-accent-200">م</span><span class="font-heading text-[13px] font-semibold text-foreground-950">مُتَرَبِّي</span></a><div class="hidden min-w-0 lg:block"><p class="font-heading text-[13px] font-semibold text-foreground-900">${fW.format(d)} · ${fH.format(d)}</p><p class="text-[11px] text-foreground-500">${fG.format(d)}</p></div></div>
-<div class="flex items-center gap-2"><span class="hidden items-center gap-1.5 rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-[10.5px] text-primary-800 md:inline-flex"><i class="ri-verified-badge-line text-[12px]"></i>حساب معتمد</span>
+<div class="flex items-center gap-2">${roleBadge()}
 <div class="relative"><button type="button" id="bellb" class="relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-background-200 bg-background-50 text-foreground-700 transition-colors duration-smooth hover:bg-background-200" aria-label="الإشعارات"><i class="ri-notification-3-line text-base"></i><span class="absolute -top-1 -left-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-500 px-1 text-[9px] font-semibold text-accent-950">3</span></button>
 <div id="bellp" style="display:none"><div id="bello" class="fixed inset-0 z-40"></div><div class="fixed inset-x-3 top-[68px] z-50 overflow-hidden rounded-lg border border-background-200 bg-background-50 md:absolute md:inset-x-auto md:left-0 md:top-full md:mt-2 md:w-[370px]"><div class="flex items-center justify-between border-b border-background-200 px-4 py-3"><div><p class="font-heading text-sm font-semibold text-foreground-950">الإشعارات</p><p class="text-[11px] text-foreground-500">آخر التحديثات على وردك ومرحلتك</p></div><button type="button" id="bellc" class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-foreground-500 hover:bg-background-100" aria-label="إغلاق الإشعارات"><i class="ri-close-line text-base"></i></button></div><ul class="max-h-[60vh] divide-y divide-background-200 overflow-y-auto no-scrollbar">${notes}</ul><div class="border-t border-background-200 bg-background-100 px-4 py-2.5 text-center"><p class="text-[11px] text-foreground-500">عيّنة توضيحية: الإشعارات الحقيقية تأتي مع تفعيل التذكيرات</p></div></div></div></div>
 <a class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-primary-100 font-heading text-[13px] font-semibold text-primary-800 transition-colors duration-smooth hover:bg-primary-200" aria-label="حسابي" href="#/more">${init}</a></div></div></header>
 <main class="mx-auto w-full max-w-[1180px] flex-1 px-4 pb-28 pt-5 md:px-8 md:pt-7 lg:pb-14">${inner}</main></div></div>
-<nav class="fixed inset-x-0 bottom-0 z-40 border-t border-background-200 bg-background-50/95 backdrop-blur-md lg:hidden"><ul class="mx-auto grid max-w-2xl grid-cols-6 items-stretch px-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1.5">${bot}</ul></nav>`;
+<nav class="fixed inset-x-0 bottom-0 z-40 border-t border-background-200 bg-background-50/95 backdrop-blur-md lg:hidden"><ul class="no-scrollbar mx-auto flex max-w-full items-stretch overflow-x-auto px-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1.5">${bot}</ul></nav>`;
 }
 function draw(inner) {
   $app.innerHTML = shell(inner); window.scrollTo(0, 0);
+  try { const a = $app.querySelector('nav.fixed li a.text-primary-700'); if (a) a.scrollIntoView({ inline: 'center', block: 'nearest' }); } catch (e) { }
   bellOpen = false;
 }
 document.addEventListener('click', e => {
@@ -367,38 +404,25 @@ async function stats(acts) {
 }
 function sample(t) { return `<span class="inline-flex items-center rounded-full border border-accent-300 bg-accent-100 px-1.5 py-0.5 text-[9px] font-medium text-accent-900">${t || 'عيّنة'}</span>`; }
 
+async function activeCount() { try { const r = await q('profiles', 'select=id&status=eq.active&limit=2000'); return r.length; } catch (e) { return 0; } }
+const fGD = new Intl.DateTimeFormat('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' });
+const fHD = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', { day: 'numeric', month: 'long', year: 'numeric' });
+const fDN = new Intl.DateTimeFormat('ar-EG', { weekday: 'long' });
+function dateCard() { const d = new Date(); return `<section class="rounded-lg border border-primary-200 bg-background-50 p-4 md:p-5" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><p style="margin:0;font-size:32px;font-weight:800;color:#0f3d24;line-height:1.2">${fDN.format(d)}</p><p style="margin:4px 0 0;font-size:22px;font-weight:700;color:#166534">${fHD.format(d).replace(/\u200f?\s?هـ?$/, '')} هـ</p></div><div style="text-align:left"><p style="margin:0;font-size:13px;color:#33443a;font-weight:600">التاريخ الميلادي</p><p style="margin:2px 0 0;font-size:20px;font-weight:700;color:#14391f">${fGD.format(d)}</p></div></section>`; }
 async function viewHome() {
   await loadMeCtx();
-  const [acts, day, stages] = await Promise.all([loadActivities(), loadDay(me.id, today()), q('stages', 'select=*&order=order_index.asc')]);
-  const st = await stats(acts);
-  const total = acts.length, states = acts.map(a => [a, actState(a, day)]), done = states.filter(s => s[1].done).length, P = pct(done, total), rem = total - done;
-  const cur = stages.find(s => s.id === me.stage_id) || stages[0] || { name: 'المرحلة التمهيدية', min_days: 30 }, ci = Math.max(0, stages.findIndex(s => s.id === cur.id));
-  const need = cur.min_days || 30, elig = st.qual >= need;
-  const todayLogs = day.logs.filter(l => l.recorded_at).map(l => new Date(l.recorded_at)).sort((a, b) => b - a)[0];
-  const lastT = todayLogs ? `آخر تسجيل اليوم ${new Intl.DateTimeFormat('ar-EG', { hour: 'numeric', minute: '2-digit' }).format(todayLogs)}` : 'لم تسجّل شيئًا اليوم بعد';
-  const cats = CAT_ORDER.map(c => { const l = states.filter(s => s[0].category === c); return { c, name: CATS[c], d: l.filter(s => s[1].done).length, t: l.length }; }).filter(x => x.t);
-  const left = states.filter(s => !s[1].done);
-  const stepper = (stages.length ? stages : [cur]).map((s, i) => `<li class="min-w-0 flex-1"><div class="flex items-center"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${i < ci ? 'bg-primary-600 text-background-50' : i === ci ? 'bg-accent-500 text-accent-950' : 'border border-background-300 bg-background-100 text-foreground-400'}">${i + 1}</span>${i < stages.length - 1 ? '<span class="mx-1 h-px flex-1 bg-background-300"></span>' : ''}</div><p class="mt-2 truncate text-[10.5px] leading-tight ${i === ci ? 'font-semibold text-primary-800' : 'text-foreground-400'}">${esc(s.name)}</p><p class="mt-0.5 text-[9.5px] text-foreground-400">${i < ci ? 'مكتملة' : i === ci ? 'الحالية' : 'مقفلة'}</p></li>`).join('');
-  const card = (t, v, s, ic, cl, d, smp) => `<div class="animate-rise delay-${d} rounded-lg border border-background-200 bg-background-50 p-3.5 transition-colors duration-smooth hover:border-primary-200"><div class="flex items-start justify-between gap-2"><p class="text-[11px] text-foreground-500">${t}</p><span class="flex h-7 w-7 items-center justify-center rounded-md ${cl}"><i class="${ic} text-[13px]"></i></span></div><p class="num mt-2 text-xl font-semibold leading-none text-foreground-950 md:text-[22px]">${v}</p><p class="mt-1.5 truncate text-[10.5px] text-foreground-400">${s}${smp ? ' ' + sample() : ''}</p></div>`;
-  draw(wrapS(whiteBanner() + `
-<section class="animate-rise overflow-hidden rounded-lg border border-primary-800 bg-primary-800"><div class="pattern-emerald"><div class="flex flex-col gap-6 p-5 md:flex-row md:items-center md:justify-between md:gap-8 md:p-7"><div class="min-w-0"><span class="inline-flex items-center gap-1.5 rounded-full border border-accent-300/30 bg-accent-400/10 px-2.5 py-1 text-[11px] text-accent-200"><i class="ri-shield-check-line text-[13px]"></i>${esc(cur.name)} · ${esc(me.group_name || 'بدون حلقة')}</span>
-<h1 class="mt-3 font-heading text-[22px] font-semibold leading-snug text-background-50 md:text-[28px]">السلام عليكم، ${esc(me.full_name.split(' ')[0])}</h1>
-<p class="mt-1.5 max-w-[440px] text-[13px] leading-relaxed text-primary-100/85">${total ? (rem ? `بقي ${n2a(rem)} أوراد من ورد اليوم. خطوة صغيرة الآن، وأثر يبقى.` : 'ما شاء الله، أتممت ورد اليوم. ثبّتك الله.') : 'لم يضف الشيخ أوراد اليوم بعد.'}</p>
-<div class="mt-5 flex flex-wrap items-center gap-2.5"><a class="inline-flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-md bg-accent-500 px-4 py-2.5 text-[13px] font-semibold text-accent-950 transition-colors duration-smooth hover:bg-accent-400" href="#/ward">متابعة ورد اليوم<i class="ri-arrow-left-line text-sm"></i></a><a class="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md border border-primary-400/40 px-4 py-2.5 text-[13px] text-primary-50 transition-colors duration-smooth hover:bg-primary-700" href="#/progress">رحلتي في المراحل</a></div></div>
-<div class="flex items-center gap-5 md:gap-6"><div class="relative shrink-0 rounded-full" role="img" aria-label="نسبة الإنجاز ${P} بالمئة" style="width:138px;height:138px;background:conic-gradient(oklch(var(--accent-400)) ${P}%, oklch(var(--primary-950) / 0.55) ${P}% 100%)"><div class="absolute flex flex-col items-center justify-center rounded-full bg-primary-800" style="inset:9px"><span class="num text-[26px] font-semibold leading-none text-background-50">${n2a(done)}<span class="text-[15px] text-primary-200">/${n2a(total)}</span></span><span class="mt-1.5 text-[10px] text-primary-200">أوراد اليوم</span></div></div>
-<div class="space-y-2.5"><div><p class="num text-lg font-semibold leading-none text-background-50">${n2a(P)}%</p><p class="mt-1 text-[10.5px] text-primary-200">إنجاز اليوم</p></div><div class="h-px w-16 bg-primary-400/30"></div><div><p class="num text-lg font-semibold leading-none text-accent-300">${n2a(st.streak)}</p><p class="mt-1 text-[10.5px] text-primary-200">يوم متتالٍ</p></div></div></div></div></div>
-<div class="flex flex-wrap items-center justify-between gap-2 border-t border-primary-900/60 px-5 py-2.5 md:px-7"><p class="flex items-center gap-1.5 text-[10.5px] text-primary-200/80"><i class="ri-time-line text-[12px]"></i>${lastT} · يُقفل تسجيل اليوم بعد منتصف الليل</p><p class="text-[10.5px] text-primary-200/70">${fH.format(new Date())}</p></div></section>
-<div class="grid grid-cols-2 gap-3 md:grid-cols-4">${card('التزام الأسبوع', n2a(st.week) + '%', 'متوسط آخر ٧ أيام', 'ri-line-chart-line', 'bg-primary-100 text-primary-700', 1)}${card('أيام متتالية', n2a(st.streak), 'بدون انقطاع', 'ri-fire-line', 'bg-accent-100 text-accent-800', 2)}${card('ترتيب المجموعة', '٣/١٨', 'حسب التزام الشهر', 'ri-trophy-line', 'bg-secondary-100 text-secondary-700', 3, 1)}${card('الأيام المؤهلة', n2a(Math.min(st.qual, need)) + '/' + n2a(need), 'شروط الترقية', 'ri-shield-check-line', 'bg-primary-100 text-primary-700', 4)}</div>
-<a class="animate-rise flex cursor-pointer flex-col gap-2 rounded-lg border border-accent-200 bg-accent-50 px-4 py-3 transition-colors duration-smooth hover:border-accent-300 sm:flex-row sm:items-center sm:justify-between" href="#/progress"><div class="flex items-start gap-2.5"><span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent-500 text-accent-950"><i class="ri-trophy-line text-[14px]"></i></span><div><p class="text-[13px] font-semibold text-accent-950">${elig ? 'مؤهل للانتقال إلى ' + esc((stages[ci + 1] || cur).name) : 'في طريقك إلى ' + esc((stages[ci + 1] || cur).name)}</p><p class="text-[11px] text-accent-900/75">${elig ? `استوفيت ${n2a(Math.min(st.qual, need))} من ${n2a(need)} يومًا مؤهلاً · بانتظار اعتماد الشيخ` : `استوفيت ${n2a(st.qual)} من ${n2a(need)} يومًا مؤهلاً · يُحسب اليوم المؤهل عند إنجاز ٨٠٪ من الورد`}</p></div></div><span class="inline-flex shrink-0 items-center gap-1 text-[11.5px] font-medium text-accent-900">عرض شروط الترقية<i class="ri-arrow-left-s-line text-sm"></i></span></a>
-<div class="grid gap-4 md:gap-5 lg:grid-cols-[1.55fr_1fr]"><div class="space-y-4 md:space-y-5">
-<section class="rounded-lg border border-background-200 bg-background-50 p-4 md:p-5"><div class="mb-4 flex items-start justify-between gap-3"><div><h2 class="font-heading text-[15px] font-semibold text-foreground-950">رحلة المراحل</h2><p class="mt-0.5 text-[11.5px] text-foreground-500">أنت في ${esc(cur.name)} · المرحلة ${n2a(ci + 1)} من ${n2a(stages.length || 1)}</p></div><a class="inline-flex shrink-0 cursor-pointer items-center gap-1 whitespace-nowrap rounded-md border border-background-300 px-2.5 py-1.5 text-[11px] text-foreground-700 transition-colors duration-smooth hover:border-primary-300 hover:text-primary-700" href="#/progress">التفاصيل<i class="ri-arrow-left-s-line text-sm"></i></a></div><ol class="flex items-start gap-1.5">${stepper}</ol></section>
-<section class="rounded-lg border border-background-200 bg-background-50"><div class="flex items-start justify-between gap-3 border-b border-background-200 px-4 py-3.5 md:px-5"><div><h2 class="font-heading text-[15px] font-semibold text-foreground-950">ورد اليوم</h2><p class="mt-0.5 text-[11.5px] text-foreground-500">قالب معتمد من شيخك · لا يمكن تعديله</p></div><span class="num shrink-0 rounded-full bg-primary-50 px-2.5 py-1 text-[11px] font-medium text-primary-700">${n2a(done)} من ${n2a(total)}</span></div>
-<div class="space-y-3.5 px-4 py-4 md:px-5">${cats.map(c => `<div><div class="flex items-center justify-between gap-2"><p class="text-[12.5px] font-medium text-foreground-800">${c.name}</p><p class="num text-[11px] text-foreground-500">${n2a(c.d)}/${n2a(c.t)}</p></div><div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-background-200"><div class="h-full rounded-full transition-all duration-smooth ${c.d === c.t ? 'bg-primary-500' : 'bg-accent-500'}" style="width:${pct(c.d, c.t)}%"></div></div></div>`).join('') || '<p class="text-[12px] text-foreground-500">لا توجد أوراد بعد.</p>'}</div>
-<div class="border-t border-background-200 px-4 py-3.5 md:px-5">${left.length ? `<p class="mb-2 text-[11px] text-foreground-500">المتبقي من وردك</p><ul class="space-y-1.5">${left.map(([a]) => `<li class="flex items-center gap-2 text-[12px] text-foreground-700"><span class="flex h-4 w-4 items-center justify-center rounded-full border border-background-300"><span class="h-1.5 w-1.5 rounded-full bg-accent-500"></span></span><span class="min-w-0 flex-1 truncate">${esc(a.title)}</span><span class="num shrink-0 text-[10.5px] text-foreground-400">${meta(a)}</span></li>`).join('')}</ul>` : '<p class="text-[12px] text-primary-700">أتممت كل أوراد اليوم، بارك الله فيك.</p>'}<a class="mt-3 inline-flex w-full cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-primary-600 px-3 py-2.5 text-[12.5px] font-medium text-background-50 transition-colors duration-smooth hover:bg-primary-700" href="#/ward">فتح ورد اليوم<i class="ri-arrow-left-line text-[13px]"></i></a></div></section></div>
-<div class="space-y-4 md:space-y-5">
-<section class="overflow-hidden rounded-lg border border-accent-200 bg-accent-50"><div class="pattern-gold px-4 py-4"><div class="flex items-center justify-between gap-2"><span class="inline-flex items-center gap-1.5 rounded-full bg-accent-500 px-2.5 py-1 text-[10.5px] font-semibold text-accent-950"><i class="ri-calendar-line text-[11px]"></i>جارية الآن</span><span class="num text-[11px] text-accent-800">بقي ٩ أيام ${sample()}</span></div><h2 class="mt-2.5 font-heading text-[16px] font-semibold text-accent-950">صيام الست من شوال</h2><p class="mt-1 text-[11.5px] leading-relaxed text-accent-900/80">صيام ٦ أيام · ٤٦ مشاركًا</p><div class="mt-3.5 flex items-center gap-3"><div class="h-1.5 flex-1 overflow-hidden rounded-full bg-accent-200/70"><div class="h-full rounded-full bg-accent-600" style="width:67%"></div></div><span class="num shrink-0 text-[11px] font-medium text-accent-900">٦٧%</span></div><div class="mt-4 flex items-center justify-between gap-2"><div class="flex items-center gap-1.5 text-[11px] text-accent-900"><i class="ri-trophy-line text-[13px]"></i>ترتيبك ٤ من ٤٦</div><a class="inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-md bg-accent-950 px-3 py-1.5 text-[11.5px] font-medium text-accent-50 transition-colors duration-smooth hover:bg-accent-900" href="#/seasons/shawwal-six">التفاصيل<i class="ri-arrow-left-s-line text-sm"></i></a></div></div></section>
-<section class="rounded-lg border border-background-200 bg-background-50"><div class="flex items-center justify-between gap-2 border-b border-background-200 px-4 py-3"><h2 class="flex items-center gap-2 font-heading text-[14px] font-semibold text-foreground-950">إعلانات شيخي ${sample()}</h2><a class="cursor-pointer text-[11px] text-primary-700 hover:underline" href="#/group">الكل</a></div><ul class="divide-y divide-background-200">${[['مجلس التربية الأسبوعي', 'يُعقد مجلس التربية هذا الأسبوع مساء الخميس بعد صلاة العشاء، والحضور جزء من متطلبات المرحلة.', 'الشيخ · أمس'], ['بدء التسجيل في موسم العشر من ذي الحجة', 'فُتح التسجيل في موسم العشر. يمكنك اختيار الأوراد التي ترغب بالمنافسة فيها قبل بداية الموسم.', 'إدارة الحلقة · قبل يومين'], ['تذكير بورد القرآن', 'من لم يكمل ورد القرآن اليوم فليبدأ بأقل القليل ولا يتركه، فالقليل الدائم خير من الكثير المنقطع.', 'الشيخ · قبل ٣ أيام']].map(a => `<li class="px-4 py-3 transition-colors duration-smooth hover:bg-background-100"><p class="text-[12.5px] font-medium text-foreground-900">${a[0]}</p><p class="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-foreground-500">${a[1]}</p><p class="mt-1 text-[10px] text-foreground-400">${a[2]}</p></li>`).join('')}</ul></section></div></div>
-<p class="pt-1 text-center text-[10.5px] leading-relaxed text-foreground-400">الأقسام الموسومة بـ «عيّنة» بيانات توضيحية لحين تفعيل المواسم والترتيب. أورادك وتقدّمك محفوظة فعليًا في حسابك.</p>`));
+  const [acts, day] = await Promise.all([loadMyActs(), loadDay(me.id, today())]);
+  const [st, active] = await Promise.all([stats(acts), activeCount()]);
+  const states = acts.map(a => [a, actState(a, day)]), total = acts.length, done = states.filter(s => s[1].done).length, left = states.filter(s => !s[1].done), P = pct(done, total);
+  const nm = (me.full_name || '').trim().split(/\s+/).slice(0, 2).join(' ');
+  const card = (t, v, ic) => `<div class="rounded-lg border border-background-300 bg-background-50 p-4" style="text-align:center"><i class="${ic}" style="font-size:24px;color:#166534"></i><p class="num" style="margin:6px 0 0;font-size:30px;font-weight:800;color:#0f3d24;line-height:1.1">${v}</p><p style="margin:4px 0 0;font-size:14px;font-weight:600;color:#33443a">${t}</p></div>`;
+  draw(wrapS(whiteBanner() + dateCard() + `
+<section class="overflow-hidden rounded-lg border border-primary-800 bg-primary-800"><div class="pattern-emerald"><div class="flex flex-col gap-5 p-5 md:flex-row md:items-center md:justify-between md:p-7"><div class="min-w-0"><p style="margin:0;font-size:17px;font-weight:600;color:#d8f3e3">السلام عليكم ورحمة الله وبركاته</p><h1 style="margin:4px 0 0;color:#fff">${esc(nm)}</h1>
+<p style="margin:10px 0 0;font-size:17px;line-height:1.7;color:#ecfdf3;max-width:460px">${total ? (left.length ? `المطلوب منك اليوم: ${n2a(left.length)} من ${n2a(total)} أوراد. اضغط الزر وسجّل ما أتممته.` : 'ما شاء الله، أتممت ورد اليوم كله. ثبّتك الله.') : 'لا توجد أوراد لمرحلتك بعد.'}</p>
+<a href="#/ward" style="margin-top:16px;display:flex;align-items:center;justify-content:center;gap:8px;background:#fff;color:#0f3d24;border-radius:14px;padding:14px 22px;font-size:19px;font-weight:800;text-decoration:none;max-width:360px"><i class="ri-checkbox-circle-line" style="font-size:22px"></i>سجّل ورد اليوم</a></div>
+<div class="shrink-0" style="align-self:center"><div class="relative rounded-full" role="img" aria-label="${n2a(done)} من ${n2a(total)}" style="width:150px;height:150px;background:conic-gradient(#fff ${P}%, rgba(255,255,255,.22) ${P}% 100%)"><div class="absolute flex flex-col items-center justify-center rounded-full bg-primary-800" style="inset:10px"><span class="num" style="font-size:34px;font-weight:800;color:#fff;line-height:1">${n2a(done)}<span style="font-size:19px;color:#d8f3e3">/${n2a(total)}</span></span><span style="margin-top:4px;font-size:14px;color:#d8f3e3;font-weight:600">تم اليوم</span></div></div></div></div></div></section>
+<div class="grid grid-cols-3 gap-3">${card('أيام متتالية', n2a(st.streak), 'ri-fire-line')}${card('أوراد اليوم', n2a(done) + '/' + n2a(total), 'ri-checkbox-circle-line')}${card('عدد النشطين', n2a(active), 'ri-group-line')}</div>
+${left.length ? `<section class="rounded-lg border border-background-300 bg-background-50 p-4 md:p-5"><h2 style="margin:0 0 10px;color:#0f3d24">المتبقي من وردك</h2><ul style="list-style:none;margin:0;padding:0;display:grid;gap:8px">${left.slice(0, 6).map(([a]) => `<li><a href="#/ward" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid #d9e4d6;border-radius:12px;text-decoration:none;color:#14391f;font-size:16px;font-weight:600"><span style="width:20px;height:20px;border-radius:50%;border:2px solid #86b99a;flex:none"></span><span style="flex:1">${esc(a.title)}</span><i class="ri-arrow-left-s-line" style="color:#166534"></i></a></li>`).join('')}</ul>${left.length > 6 ? `<p style="margin:10px 0 0;font-size:14px;color:#33443a">و${n2a(left.length - 6)} أوراد أخرى في صفحة وردي.</p>` : ''}</section>` : ''}`));
 }
 
 /* ward */
@@ -426,6 +450,7 @@ function wardArticle(a) {
   const head = `<div class="flex items-start gap-3"><span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md ${done ? 'bg-primary-100 text-primary-700' : 'bg-background-100 text-foreground-500'}"><i class="${ic} text-base"></i></span><div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-x-2 gap-y-1"><h3 class="text-[13px] font-medium leading-snug ${done ? 'text-foreground-600' : 'text-foreground-950'}">${esc(a.title)}</h3><span class="rounded-full border border-background-300 bg-background-100 px-2 py-0.5 text-[10px] text-foreground-500">${badge}</span>${done ? '<span class="inline-flex items-center gap-0.5 rounded-full bg-primary-100 px-2 py-0.5 text-[10px] text-primary-800"><i class="ri-check-double-line text-[11px]"></i>مكتمل</span>' : ''}</div>${a.description ? `<p class="mt-1 text-[11px] leading-relaxed text-foreground-500">${esc(a.description)}</p>` : ''}<p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-foreground-500"><span class="num">${meta(a)}</span></p></div>`;
   const wrap = body => `<article class="rounded-lg border p-3.5 transition-colors duration-smooth ${done ? 'border-primary-200 bg-primary-50' : 'border-background-200 bg-background-50'}">${body}</article>`;
   if (a.type === 'toggle') return wrap(head + `<button type="button" data-a="${a.id}" data-k="t" aria-pressed="${done}" aria-label="${done ? 'إلغاء تسجيل ' : 'تسجيل '}${esc(a.title)}" class="mt-0.5 flex h-9 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md border px-3 text-[11.5px] transition-colors duration-smooth ${done ? 'border-primary-300 bg-primary-100 text-primary-800 hover:bg-primary-200' : 'border-background-300 bg-background-50 text-foreground-700 hover:border-primary-300 hover:bg-background-100'}"><i class="${done ? 'ri-check-line' : 'ri-add-line'} text-[13px]"></i>${done ? 'تم' : 'تسجيل'}</button></div>`);
+  if (st.typed) return wrap(head + `</div><div class="mt-3 flex items-center justify-between gap-3 rounded-md border border-background-200 bg-background-100/70 p-2.5"><label for="nv${a.id.slice(0, 4)}" class="text-[13px] font-semibold text-foreground-900">اكتب العدد الذي ذكرته <span style="font-weight:500">(الهدف ${n2a(st.total)})</span></label><input id="nv${a.id.slice(0, 4)}" data-nv="${a.id}" type="number" inputmode="numeric" min="0" max="100000" step="1" value="${st.val || ''}" placeholder="٠" style="width:110px;height:44px;text-align:center;border:1.5px solid #86b99a;border-radius:10px;font:inherit;font-size:20px;font-weight:700;background:#fff"></div>`);
   if (st.sleep) return wrap(head + `</div><div class="mt-3 flex items-center justify-between gap-3 rounded-md border border-background-200 bg-background-100/70 p-2.5"><label for="sl" class="text-[11.5px] text-foreground-700">كم ساعة نمت؟ <span class="text-foreground-400">(الحد الأقصى ${n2a(st.total)})</span></label><input id="sl" data-h="${a.id}" type="number" inputmode="decimal" min="0" max="24" step="0.5" value="${st.val || ''}" placeholder="٠" style="width:84px;height:38px;text-align:center;border:1px solid #cfd9cc;border-radius:8px;font:inherit;font-size:15px;background:#fff"></div>`);
   if (a.type === 'counter') return wrap(head + `</div><div class="mt-3 rounded-md border border-background-200 bg-background-100/70 p-2.5"><div class="flex items-center justify-between gap-2"><button type="button" data-a="${a.id}" data-k="m" ${st.val <= 0 ? 'disabled' : ''} aria-label="إنقاص عدد ${esc(a.title)}" class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-background-300 bg-background-50 text-foreground-700 transition-colors duration-smooth hover:bg-background-200 disabled:cursor-not-allowed disabled:opacity-40"><i class="ri-subtract-line text-[14px]"></i></button><div class="min-w-0 flex-1 text-center"><p class="num text-[16px] font-semibold leading-none text-foreground-950">${n2a(st.val)}<span class="text-[11px] font-normal text-foreground-400"> / ${n2a(st.total)}</span></p><p class="mt-1 text-[10px] text-foreground-500">الهدف اليومي ${n2a(st.total)} ${esc(UNIT(a))}</p></div><button type="button" data-a="${a.id}" data-k="p" aria-label="زيادة عدد ${esc(a.title)}" class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-primary-300 bg-primary-600 text-background-50 transition-colors duration-smooth hover:bg-primary-700"><i class="ri-add-line text-[14px]"></i></button></div><div class="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-background-200"><div class="h-full rounded-full bg-primary-500 transition-all duration-smooth" style="width:${Math.min(100, pct(st.val, st.total))}%"></div></div></div>${juzBlock(a)}`);
   const lbl = a._half ? 'نصف جزء' : a.quran_unit === 'pages' ? 'الصفحة' : 'الجزء';
@@ -433,22 +458,28 @@ function wardArticle(a) {
 }
 async function viewWard() {
   const [acts, day] = await Promise.all([loadMyActs(), loadDay(me.id, today())]);
-  ctx.acts = acts; ctx.day = day; ctx.juzOther = 0;
+  ctx.acts = acts; ctx.day = day; ctx.juzOther = 0; ctx.wardFast = false;
   if (acts.some(a => a.monthly_juz)) { try { const t0 = new Date(); t0.setDate(t0.getDate() - (hjDay(t0) - 1)); const rows = await q('wird_logs', `select=log_date,qiyam_juz&member_id=eq.${me.id}&log_date=gte.${ymd(t0)}&log_date=lt.${today()}&qiyam_juz=gt.0`); ctx.juzOther = rows.reduce((a, r) => a + (+r.qiyam_juz || 0), 0); } catch (e) { } }
   const paint = () => {
     const sts = acts.map(a => actState(a, ctx.day)), done = sts.filter(s => s.done).length, partial = sts.filter(s => !s.done && s.val > 0).length, total = acts.length, P = pct(done, total), rem = total - done, d = new Date();
     const sec = CAT_ORDER.map(c => { const l = acts.filter(a => a.category === c); if (!l.length) return ''; const dn = l.filter(a => actState(a, ctx.day).done).length; return `<section class="animate-fade"><div class="mb-2 flex items-end justify-between gap-2 px-1"><div><h2 class="font-heading text-[13.5px] font-semibold text-foreground-950">${CATS[c]}</h2><p class="text-[10.5px] text-foreground-400">${CAT_SUB[c]}</p></div><p class="num shrink-0 text-[11px] text-foreground-500">${n2a(dn)}/${n2a(l.length)}</p></div><div class="space-y-2">${l.map(wardArticle).join('')}</div></section>`; }).join('');
     const y = window.scrollY;
-    draw(wrapS(whiteBanner() + `<div class="animate-rise rounded-lg border border-background-200 bg-background-50"><div class="flex items-center justify-between gap-2 border-b border-background-200 px-3 py-2.5"><div class="flex items-center gap-1.5 text-[11.5px] text-foreground-500"><i class="ri-calendar-event-line text-[13px]"></i>${fG.format(d)}</div><div class="flex items-center gap-1.5"><a class="inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-full border border-background-300 bg-background-50 px-2.5 py-1 text-[10px] text-foreground-700 transition-colors duration-smooth hover:bg-background-200" href="#/ward/history"><i class="ri-calendar-2-line text-[11px]"></i>سجل الشهر</a><span id="sync"></span></div></div>
+    const HTML = (whiteBanner() + `<div class="animate-rise rounded-lg border border-background-200 bg-background-50"><div class="flex items-center justify-between gap-2 border-b border-background-200 px-3 py-2.5"><div class="flex items-center gap-1.5 text-[11.5px] text-foreground-500"><i class="ri-calendar-event-line text-[13px]"></i>${fG.format(d)}</div><div class="flex items-center gap-1.5"><a class="inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-full border border-background-300 bg-background-50 px-2.5 py-1 text-[10px] text-foreground-700 transition-colors duration-smooth hover:bg-background-200" href="#/ward/history"><i class="ri-calendar-2-line text-[11px]"></i>سجل الشهر</a><span id="sync"></span></div></div>
 <div class="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between md:p-5"><div class="flex items-center gap-4"><div class="relative shrink-0 rounded-full" role="img" aria-label="نسبة الإنجاز ${P} بالمئة" style="width:92px;height:92px;background:conic-gradient(oklch(var(--primary-500)) ${P}%, oklch(var(--background-200)) ${P}% 100%)"><div class="absolute flex flex-col items-center justify-center rounded-full bg-background-50" style="inset:7px"><span class="num text-[19px] font-semibold leading-none text-foreground-950">${n2a(done)}<span class="text-[12px] text-foreground-400">/${n2a(total)}</span></span><span class="mt-1 text-[9px] text-foreground-400">مكتمل</span></div></div><div><p class="text-[11.5px] text-foreground-500">${esc(me.full_name)}</p><h1 class="mt-0.5 font-heading text-lg font-semibold text-foreground-950">ورد اليوم</h1><p class="mt-1 text-[11.5px] text-foreground-500">بقي ${n2a(rem)} أوراد · ${n2a(P)}% إنجاز</p><p class="mt-0.5 text-[10.5px] text-foreground-400">${fH.format(d)}</p></div></div>
 <div class="grid w-full grid-cols-3 gap-2 sm:w-auto sm:min-w-[260px]"><div class="rounded-md border border-primary-200 bg-primary-50 px-2 py-2 text-center"><p class="num text-[15px] font-semibold leading-none text-primary-800">${n2a(done)}</p><p class="mt-1 text-[9.5px] text-primary-700">مكتمل</p></div><div class="rounded-md border border-secondary-200 bg-secondary-50 px-2 py-2 text-center"><p class="num text-[15px] font-semibold leading-none text-secondary-900">${n2a(partial)}</p><p class="mt-1 text-[9.5px] text-secondary-800">قيد الإنجاز</p></div><div class="rounded-md border border-background-300 bg-background-100 px-2 py-2 text-center"><p class="num text-[15px] font-semibold leading-none text-foreground-800">${n2a(total - done - partial)}</p><p class="mt-1 text-[9.5px] text-foreground-500">لم يبدأ</p></div></div></div>
 <div class="border-t border-background-200 bg-background-100 px-4 py-2.5"><p class="flex items-start gap-1.5 text-[10.5px] leading-relaxed text-foreground-500"><i class="ri-lock-line mt-0.5 text-[12px]"></i>القالب معتمد من شيخك ولا يمكن تعديله. الورد غير المسجل يبقى غير مسجل ولا يُحتسب تلقائيًا، وسجل اليوم يُغلق بعد منتصف الليل.</p></div></div>
-${sec || '<div class="rounded-lg border border-background-200 bg-background-50 p-6 text-center text-[12px] text-foreground-500">لا توجد أوراد بعد. سيضيفها الشيخ.</div>'}`));
-    window.scrollTo(0, y); setSync(ctx.syncState || 'idle'); bindWard(paint);
+${sec || '<div class="rounded-lg border border-background-200 bg-background-50 p-6 text-center text-[12px] text-foreground-500">لا توجد أوراد بعد. سيضيفها الشيخ.</div>'}`);
+    const wr = document.getElementById('wr'); if (ctx.wardFast && wr) { wr.innerHTML = HTML; wr.querySelectorAll('[class*=animate-]').forEach(e => e.classList.remove('animate-rise', 'animate-fade')); } else { draw(wrapS('<div id="wr" class="space-y-4 md:space-y-5">' + HTML + '</div>')); window.scrollTo(0, y); }
+    ctx.wardFast = true; setSync(ctx.syncState || 'idle'); bindWard(paint);
   };
   paint();
 }
 function bindWard(paint) {
+  $app.querySelectorAll('[data-nv]').forEach(el => el.onchange = async () => {
+    const a = ctx.acts.find(x => x.id === el.dataset.nv), day = ctx.day, prev = JSON.stringify(day); let v = Math.round(parseFloat(el.value)); if (!(v >= 0)) v = 0; v = Math.min(100000, v);
+    const c = v >= (a.target_count || 1), l = day.logs.find(l => l.activity_id === a.id); if (l) { l.completed = c; l.counter_value = v; } else day.logs.push({ activity_id: a.id, completed: c, counter_value: v });
+    try { paint(); setSync('saving'); await setLog(a, c, v); setSync('ok'); } catch (e) { ctx.day = JSON.parse(prev); paint(); toast('تعذّر الحفظ: ' + errAr(e)); }
+  });
   $app.querySelectorAll('[data-j]').forEach(el => el.onchange = async () => {
     const a = ctx.acts.find(x => x.id === el.dataset.j), day = ctx.day, prev = JSON.stringify(day); let v = parseFloat(el.value); if (!(v >= 0)) v = 0; v = Math.min(30, Math.round(v * 2) / 2);
     let l = day.logs.find(l => l.activity_id === a.id); if (!l) { l = { activity_id: a.id, completed: false, counter_value: 0 }; day.logs.push(l); } l.qiyam_juz = v;
@@ -569,85 +600,84 @@ async function renderCal(host, uid, st, onSel) {
   });
 }
 /* ---------- sheikh views ---------- */
-function sheikhTabs_old(a) {
-  const l = [['/sheikh', 'الرئيسية'], ['/sheikh/members', 'الأعضاء'], ['/sheikh/roster', 'المجموعات'], ['/sheikh/requests', 'الطلبات'], ['/sheikh/promotions', 'الترقيات'], ['/sheikh/wird', 'الأوراد']];
-  return '<div class="chips">' + l.map(([p, t]) => `<a class="chip ${a === p ? 'on' : ''}" href="#${p}" style="text-decoration:none;color:inherit">${t}</a>`).join('') + '</div>';
+/* ---------- quran picker ---------- */
+const SURAH = [['الفاتحة',7],['البقرة',286],['آل عمران',200],['النساء',176],['المائدة',120],['الأنعام',165],['الأعراف',206],['الأنفال',75],['التوبة',129],['يونس',109],['هود',123],['يوسف',111],['الرعد',43],['إبراهيم',52],['الحجر',99],['النحل',128],['الإسراء',111],['الكهف',110],['مريم',98],['طه',135],['الأنبياء',112],['الحج',78],['المؤمنون',118],['النور',64],['الفرقان',77],['الشعراء',227],['النمل',93],['القصص',88],['العنكبوت',69],['الروم',60],['لقمان',34],['السجدة',30],['الأحزاب',73],['سبأ',54],['فاطر',45],['يس',83],['الصافات',182],['ص',88],['الزمر',75],['غافر',85],['فصلت',54],['الشورى',53],['الزخرف',89],['الدخان',59],['الجاثية',37],['الأحقاف',35],['محمد',38],['الفتح',29],['الحجرات',18],['ق',45],['الذاريات',60],['الطور',49],['النجم',62],['القمر',55],['الرحمن',78],['الواقعة',96],['الحديد',29],['المجادلة',22],['الحشر',24],['الممتحنة',13],['الصف',14],['الجمعة',11],['المنافقون',11],['التغابن',18],['الطلاق',12],['التحريم',12],['الملك',30],['القلم',52],['الحاقة',52],['المعارج',44],['نوح',28],['الجن',28],['المزمل',20],['المدثر',56],['القيامة',40],['الإنسان',31],['المرسلات',50],['النبأ',40],['النازعات',46],['عبس',42],['التكوير',29],['الانفطار',19],['المطففين',36],['الانشقاق',25],['البروج',22],['الطارق',17],['الأعلى',19],['الغاشية',26],['الفجر',30],['البلد',20],['الشمس',15],['الليل',21],['الضحى',11],['الشرح',8],['التين',8],['العلق',19],['القدر',5],['البينة',8],['الزلزلة',8],['العاديات',11],['القارعة',11],['التكاثر',8],['العصر',3],['الهمزة',9],['الفيل',5],['قريش',4],['الماعون',7],['الكوثر',3],['الكافرون',6],['النصر',3],['المسد',5],['الإخلاص',4],['الفلق',5],['الناس',6]];
+async function viewQuran() {
+  await loadMeCtx();
+  const reads = await q('quran_reads', `select=*&member_id=eq.${me.id}&order=created_at.desc&limit=200`);
+  const td = today(); let list = reads.filter(r => r.read_date === td); const last = reads[0];
+  const sName = n => SURAH[n - 1][0];
+  const paint = () => {
+    const tot = list.reduce((a, r) => a + (r.to_ayah - r.from_ayah + 1), 0), cur = ctx.qsel || (last ? { s: last.surah, f: last.to_ayah < SURAH[last.surah - 1][1] ? last.to_ayah + 1 : 1 } : { s: 1, f: 1 });
+    if (last && cur.s === last.surah && cur.f > SURAH[cur.s - 1][1]) { cur.s = Math.min(114, cur.s + 1); cur.f = 1; }
+    const max = SURAH[cur.s - 1][1];
+    const inp = 'width:100%;height:50px;border:1.5px solid #86b99a;border-radius:12px;font:inherit;font-size:19px;font-weight:700;text-align:center;background:#fff;color:#0f3d24';
+    draw(wrapS(`<div style="display:grid;gap:14px"><div><h1 style="margin:0;color:#0f3d24">ورد القرآن</h1><p style="margin:4px 0 0;font-size:16px;color:#33443a">اختر السورة ومن أي آية إلى أي آية قرأت، ثم اضغط حفظ.</p></div>
+${last ? `<section class="rounded-lg border border-accent-300 bg-accent-50 p-4"><p style="margin:0;font-size:14px;font-weight:600;color:#6b4a00">آخر موضع وقفت عنده</p><p style="margin:4px 0 0;font-size:22px;font-weight:800;color:#3d2a00">سورة ${esc(sName(last.surah))} · الآية ${n2a(last.to_ayah)}</p></section>` : ''}
+<section class="rounded-lg border border-background-300 bg-background-50 p-4" style="display:grid;gap:12px"><label style="font-size:16px;font-weight:700;color:#0f3d24">السورة</label><select id="qs" style="${inp};text-align-last:center">${SURAH.map((x, i) => `<option value="${i + 1}" ${i + 1 === cur.s ? 'selected' : ''}>${n2a(i + 1)}. ${x[0]} (${n2a(x[1])} آية)</option>`).join('')}</select>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div><label style="font-size:16px;font-weight:700;color:#0f3d24">من الآية</label><input id="qf" type="number" inputmode="numeric" min="1" max="${max}" value="${cur.f}" style="${inp}"></div><div><label style="font-size:16px;font-weight:700;color:#0f3d24">إلى الآية</label><input id="qt" type="number" inputmode="numeric" min="1" max="${max}" value="${cur.t || max}" style="${inp}"></div></div>
+<button type="button" id="qall" style="border:1px solid #86b99a;background:#fff;color:#166534;border-radius:12px;padding:10px;font:inherit;font-size:15px;font-weight:700;cursor:pointer">إلى آخر السورة (${n2a(max)})</button>
+<button type="button" id="qsave" style="border:0;background:#166534;color:#fff;border-radius:14px;padding:15px;font:inherit;font-size:19px;font-weight:800;cursor:pointer">حفظ القراءة</button><p id="qe" style="margin:0;color:#b91c1c;font-size:15px;font-weight:600"></p></section>
+<section class="rounded-lg border border-background-300 bg-background-50 p-4"><h2 style="margin:0 0 8px;color:#0f3d24">قراءة اليوم · ${n2a(tot)} آية</h2>${list.length ? `<ul style="list-style:none;margin:0;padding:0;display:grid;gap:8px">${list.map(r => `<li style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #d9e4d6;border-radius:12px;font-size:17px;font-weight:600;color:#14391f"><span style="flex:1">${esc(sName(r.surah))} · من ${n2a(r.from_ayah)} إلى ${n2a(r.to_ayah)}</span><button data-qd="${r.id}" aria-label="حذف" style="border:1px solid #f1b4b4;background:#fff5f5;color:#b91c1c;border-radius:10px;padding:6px 10px;font:inherit;font-size:14px;cursor:pointer">حذف</button></li>`).join('')}</ul>` : '<p style="margin:0;font-size:16px;color:#33443a">لم تسجّل قراءة اليوم بعد.</p>'}</section></div>`));
+    const ss = document.getElementById('qs'), qf = document.getElementById('qf'), qt = document.getElementById('qt');
+    ss.onchange = () => { ctx.qsel = { s: +ss.value, f: 1 }; paint(); };
+    document.getElementById('qall').onclick = () => { qt.value = max; };
+    document.getElementById('qsave').onclick = async () => {
+      const f = Math.round(+qf.value), t = Math.round(+qt.value), e = document.getElementById('qe');
+      if (!(f >= 1 && t >= f && t <= max)) { e.textContent = 'تأكد أن الآية الأولى أقل من أو تساوي الأخيرة، ولا تزيد عن ' + n2a(max); return; }
+      const row = { tenant_id: TENANT, member_id: me.id, read_date: td, surah: cur.s, from_ayah: f, to_ayah: t };
+      const tmp = Object.assign({ id: 'tmp' + Date.now(), created_at: new Date().toISOString() }, row); list = [tmp].concat(list); reads.unshift(tmp); ctx.qsel = { s: t >= max ? Math.min(114, cur.s + 1) : cur.s, f: t >= max ? 1 : t + 1 }; paint();
+      try { const r = await ins('quran_reads', row); const real = Array.isArray(r) ? r[0] : r; if (real && real.id) { tmp.id = real.id; paint(); } toast('تم الحفظ'); } catch (er) { list = list.filter(x => x !== tmp); const k = reads.indexOf(tmp); if (k >= 0) reads.splice(k, 1); paint(); toast('تعذّر الحفظ: ' + errAr(er)); }
+    };
+    $app.querySelectorAll('[data-qd]').forEach(b => b.onclick = async () => { const id = b.dataset.qd; list = list.filter(x => x.id !== id); const k = reads.findIndex(x => x.id === id); if (k >= 0) reads.splice(k, 1); paint(); try { await del('quran_reads', 'id=eq.' + id); } catch (er) { toast('تعذّر الحذف'); } });
+  };
+  ctx.qsel = null; paint();
 }
 
-async function viewSheikh_old() {
-  const [members, reqs, acts, logs] = await Promise.all([
-    q('profiles', 'select=id,full_name,last_active_at,group_id,stage_id&role=eq.member&status=eq.active'),
-    q('membership_requests', 'select=id&status=eq.pending'), loadActivities(), q('wird_logs', `select=member_id,completed&log_date=eq.${today()}&completed=eq.true`)]);
-  const per = {}; logs.forEach(l => per[l.member_id] = (per[l.member_id] || 0) + 1);
-  const logged = members.filter(m => per[m.id]).length, full = members.filter(m => acts.length && per[m.id] >= acts.length).length;
-  $app.innerHTML = sheikhPage('/sheikh', 'لوحة الشيخ', `<div class="stats"><div class="stat"><b>${n2a(members.length)}</b>أعضاء نشطون</div><div class="stat"><b>${n2a(reqs.length)}</b>طلبات معلّقة</div><div class="stat"><b>${n2a(logged)}</b>سجّلوا اليوم</div><div class="stat"><b>${n2a(full)}</b>أكملوا الورد كاملًا</div></div>
-<div class="card"><h3>التزام اليوم</h3>${members.length ? members.map(m => `<a class="row sp" style="padding:8px 0;text-decoration:none;color:inherit" href="#/sheikh/member/${m.id}"><span>${esc(m.full_name)}</span><span class="pill ${per[m.id] ? '' : 'w'}">${n2a(per[m.id] || 0)} / ${n2a(acts.length)}</span></a>`).join('') : '<p class="muted">لا يوجد أعضاء مفعّلون بعد.</p>'}</div>`);
+/* ---------- settings ---------- */
+async function viewSettings() {
+  await loadMeCtx();
+  const prev = localStorage.getItem('prev_role') || '';
+  const row = (href, ic, t, sub) => `<a href="${href}" style="display:flex;align-items:center;gap:12px;padding:14px;border:1px solid #d9e4d6;border-radius:14px;background:#fff;text-decoration:none;color:#14391f"><span style="width:42px;height:42px;border-radius:12px;background:#e7f4ec;color:#166534;display:flex;align-items:center;justify-content:center;font-size:21px;flex:none"><i class="${ic}"></i></span><span style="flex:1"><span style="display:block;font-size:17px;font-weight:700">${t}</span><span style="display:block;font-size:14px;color:#33443a">${sub}</span></span><i class="ri-arrow-left-s-line" style="font-size:20px;color:#166534"></i></a>`;
+  const seg = (v, t) => `<button type="button" data-pv="${v}" style="flex:1;border:1.5px solid ${prev === v ? '#166534' : '#bcd9c6'};background:${prev === v ? '#166534' : '#fff'};color:${prev === v ? '#fff' : '#14532d'};border-radius:12px;padding:11px 6px;font:inherit;font-size:15px;font-weight:700;cursor:pointer">${t}</button>`;
+  draw(wrapS(`<div style="display:grid;gap:14px"><div><h1 style="margin:0;color:#0f3d24">الإعدادات</h1><p style="margin:4px 0 0;font-size:16px;color:#33443a">${esc(me.full_name)} · ${esc(me.email || '')} · ${ROLE_AR[me.real_role || me.role] || ''}</p></div>
+${me.real_role ? `<section class="rounded-lg border border-accent-300 bg-accent-50 p-4"><h2 style="margin:0;color:#3d2a00">معاينة التطبيق (للمالك فقط)</h2><p style="margin:4px 0 10px;font-size:15px;color:#4a3600">اعرض التطبيق كما يراه الشيخ أو المشرف أو العضو. صلاحياتك الفعلية لا تتغيّر.</p><div style="display:flex;gap:8px;flex-wrap:wrap">${seg('', 'حسابي')}${seg('sheikh', 'شيخ')}${seg('supervisor', 'مشرف')}${seg('member', 'عضو')}</div></section>` : ''}
+<div style="display:grid;gap:10px">${row('#/more', 'ri-user-3-line', 'حسابي', 'بيانات الحساب والمرحلة والحلقة')}${row('#/reminders', 'ri-notification-3-line', 'الإشعارات والتذكيرات', 'مواقيت الأذكار والأيام البيض وغيرها')}${row('#/install', 'ri-smartphone-line', 'تثبيت التطبيق', 'إضافته إلى الشاشة الرئيسية')}${row('#/ward/history', 'ri-calendar-2-line', 'سجل الشهر', 'ما سجّلته في الأيام السابقة')}</div>
+<button type="button" id="lo2" style="border:1.5px solid #bcd9c6;background:#fff;color:#14532d;border-radius:14px;padding:14px;font:inherit;font-size:17px;font-weight:700;cursor:pointer">تسجيل الخروج</button></div>`));
+  document.getElementById('lo2').onclick = logout;
 }
-async function viewMembers_old() {
-  const [members, groups, stages] = await Promise.all([q('profiles', 'select=*&role=eq.member&order=created_at.desc'), q('tarbiyah_groups', 'select=id,name'), q('stages', 'select=id,name')]);
-  const gn = id => (groups.find(g => g.id === id) || {}).name || '—', sn = id => (stages.find(s => s.id === id) || {}).name || '—';
-  const stp = { active: ['نشط', ''], pending: ['معلّق', 'w'], suspended: ['موقوف', 'r'], archived: ['مؤرشف', 'r'] };
-  $app.innerHTML = sheikhPage('/sheikh/members', 'الأعضاء', members.length ? members.map(m => `<a class="card" style="display:block;text-decoration:none;color:inherit" href="#/sheikh/member/${m.id}"><div class="row sp"><b>${esc(m.full_name)}</b><span class="pill ${stp[m.status][1]}">${stp[m.status][0]}</span></div><div class="muted small">${CATEGORY[m.category]} · ${esc(gn(m.group_id))} · ${esc(sn(m.stage_id))}</div><div class="muted small">آخر نشاط: ${m.last_active_at ? new Date(m.last_active_at).toLocaleDateString('ar-EG') : '—'}</div></a>`).join('') : '<div class="card muted center">لا يوجد أعضاء.</div>');
-}
-async function viewMember_old(id) {
-  const [p, fams, notes] = await Promise.all([q('profiles', 'select=*&id=eq.' + id), q('families', 'select=id,name&order=name'), q('member_notes', `select=*&member_id=eq.${id}&order=created_at.desc`)]);
-  const m = p[0]; if (!m) return go('/sheikh/members');
-  $app.innerHTML = sheikhPage('/sheikh/members', esc(m.full_name), `<div class="card"><div class="muted">${esc(m.email)} · ${CATEGORY[m.category]}</div></div><div class="card" id="cal"></div>
-<div class="card"><h3>ملاحظات الشيخ</h3><form id="nf"><textarea name="b" rows="2" required placeholder="اكتب ملاحظة…"></textarea><button class="btn sm">إضافة</button></form>${notes.map(n => `<hr><div class="small">${esc(n.body)}</div><div class="muted small">${esc(n.author_name || '')} · ${new Date(n.created_at).toLocaleDateString('ar-EG')}</div>`).join('')}</div>`);
-  document.getElementById('sv').onclick = async () => { try { let fid = document.getElementById('fa').value || null; if (fid === '__new') { const nm = prompt('اسم الأسرة'); if (!nm) return; const r = await ins('families', { tenant_id: TENANT, name: nm.trim() }); fid = (Array.isArray(r) ? r[0] : r).id; } const row = { audience: document.getElementById('au').value || null, family_id: fid }; const ro = document.getElementById('ro'); if (ro && m.role !== 'sheikh') row.role = ro.value; await upd('profiles', 'id=eq.' + id, row); toast('تم الحفظ'); viewMember(id); } catch (e) { toast(errAr(e)); } };
-  const n = new Date(); renderCal(document.getElementById('cal'), id, { y: n.getFullYear(), m: n.getMonth(), sel: null });
-  document.getElementById('nf').onsubmit = async ev => { ev.preventDefault(); try { await ins('member_notes', { tenant_id: TENANT, member_id: id, author_id: me.id, author_name: me.full_name, body: new FormData(ev.target).get('b').trim() }); toast('تمت الإضافة'); viewMember(id); } catch (e) { toast(errAr(e)); } };
-}
-async function viewRequests_old() {
-  const reqs = await q('membership_requests', 'select=*&order=created_at.desc&limit=60');
-  const pend = reqs.filter(r => r.status === 'pending'), rest = reqs.filter(r => r.status !== 'pending');
-  const card = (r, act) => `<div class="card"><div class="row sp"><b>${esc(r.full_name)}</b><span class="pill ${r.status === 'pending' ? 'w' : r.status === 'approved' ? '' : 'r'}">${{ pending: 'معلّق', approved: 'مقبول', rejected: 'مرفوض' }[r.status]}</span></div><div class="muted small" dir="ltr" style="text-align:right">${esc(r.email)}</div><div class="muted small">${CATEGORY[r.category]} · ${esc(r.group_name || 'بدون حلقة')}</div>${r.note ? `<div class="small">${esc(r.note)}</div>` : ''}${act ? `<div class="row" style="margin-top:10px"><button class="btn sm grow" data-ok="${r.id}">قبول</button><button class="btn red sm grow" data-no="${r.id}">رفض</button></div>` : ''}</div>`;
-  $app.innerHTML = sheikhPage('/sheikh/requests', 'طلبات العضوية', (pend.length ? pend.map(r => card(r, true)).join('') : '<div class="card muted center">لا توجد طلبات معلّقة ✅</div>') + (rest.length ? '<h3>السابقة</h3>' + rest.map(r => card(r, false)).join('') : ''));
-  const act = async (id, ok) => {
-    const r = reqs.find(x => x.id === id);
-    try {
-      await upd('membership_requests', 'id=eq.' + id, { status: ok ? 'approved' : 'rejected', reviewed_by: me.id, reviewed_at: new Date().toISOString() });
-      if (r.user_id) {
-        if (ok) { await upd('profiles', 'id=eq.' + r.user_id, { status: 'active', sheikh_id: me.id, group_id: r.group_id }); await rpc('start_member_stage', { p_member_id: r.user_id }).catch(() => { }); }
-        else await upd('profiles', 'id=eq.' + r.user_id, { status: 'archived' });
-      }
-      toast(ok ? 'تم قبول العضو' : 'تم الرفض'); viewRequests();
-    } catch (e) { toast(errAr(e)); }
+
+/* ---------- stage editor ---------- */
+async function viewStages(sel) {
+  const [stages, acts, swr] = await Promise.all([q('stages', 'select=*&order=order_index.asc'), q('wird_activities', 'select=*&order=order_index.asc,created_at.asc'), q('stage_wird', 'select=*&limit=2000')]);
+  sel = sel || window.__stSel || (stages[0] || {}).id; window.__stSel = sel; const stg = stages.find(x => x.id === sel) || stages[0]; if (!stg) return draw(wrapS('<p>لا توجد مراحل.</p>'));
+  const rows = {}; swr.filter(r => r.stage_id === stg.id).forEach(r => rows[r.activity_id] = r);
+  const ro = me.role === 'supervisor'; const dis = ro ? 'disabled' : '';
+  const num = (id, f, v, ph, step) => `<input data-sw="${id}" data-f="${f}" type="number" step="${step || 1}" min="0" value="${v == null ? '' : v}" placeholder="${ph}" ${dis} style="width:88px;height:40px;border:1.5px solid #bcd9c6;border-radius:10px;text-align:center;font:inherit;font-size:16px;font-weight:600;background:#fff">`;
+  const lab = t => `<span style="font-size:13.5px;color:#33443a;font-weight:600">${t}</span>`;
+  const item = a => { const r = rows[a.id] || {}; const on = !!r.enabled; const fields = []; 
+    if (a.type === 'counter') { fields.push(lab('الهدف') + num(a.id, 'target_count', r.target_count, 'الهدف', 1)); fields.push(lab('الحد الأقصى') + num(a.id, 'max_val', r.max_val, 'اختياري', 1)); }
+    if (a.type === 'quran') fields.push(lab('أجزاء (٠.٥ = نصف جزء)') + num(a.id, 'target_count', r.target_count, 'العدد', 0.5));
+    if (a.day_rule === 'fast') { fields.push(lab('في الأسبوع') + num(a.id, 'per_week', r.per_week, '٠', 1)); fields.push(lab('في الشهر') + num(a.id, 'per_month', r.per_month, '٠', 1)); }
+    return `<li data-row="${a.id}" style="border:1px solid ${on ? '#86b99a' : '#d9e4d6'};background:${on ? '#f3faf5' : '#fafafa'};border-radius:14px;padding:12px;display:grid;gap:10px"><label style="display:flex;align-items:center;gap:10px;font-size:17px;font-weight:700;color:#0f3d24;cursor:pointer"><input data-sw="${a.id}" data-f="enabled" type="checkbox" ${on ? 'checked' : ''} ${dis} style="width:22px;height:22px;accent-color:#166534"><span style="flex:1">${esc(a.title)}</span><span style="font-size:13px;font-weight:600;color:#33443a">${esc(a.grp || CATS[a.category] || '')}${a.is_active ? '' : ' · موقوف عامًا'}</span></label>${fields.length ? `<div style="display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center">${fields.join('')}</div>` : ''}<input data-sw="${a.id}" data-f="note" value="${esc(r.note || '')}" placeholder="ملاحظة (اختياري)" ${dis} style="height:40px;border:1.5px solid #d9e4d6;border-radius:10px;padding:0 10px;font:inherit;font-size:15px;background:#fff"></li>`; };
+  $app.innerHTML = sheikhPage('/sheikh/stages', 'المراحل وأوراد كل مرحلة', `<div style="display:grid;gap:12px"><div style="display:flex;gap:8px;flex-wrap:wrap">${stages.map(x => `<button type="button" data-st="${x.id}" style="border:1.5px solid ${x.id === stg.id ? '#166534' : '#bcd9c6'};background:${x.id === stg.id ? '#166534' : '#fff'};color:${x.id === stg.id ? '#fff' : '#14532d'};border-radius:999px;padding:9px 16px;font:inherit;font-size:16px;font-weight:700;cursor:pointer">${esc(x.name)}</button>`).join('')}</div>
+<section class="panel"><b style="font-size:17px">${esc(stg.name)}</b><div class="mt" style="margin-top:6px">${ro ? 'عرض فقط للمشرف.' : 'فعّل الورد لهذه المرحلة وعدّل هدفه. كل تغيير يُحفظ تلقائيًا.'}</div>
+<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px"><label style="font-size:15px;font-weight:600">اسم المرحلة</label><input id="stn" value="${esc(stg.name)}" ${dis} style="height:42px;border:1.5px solid #bcd9c6;border-radius:10px;padding:0 10px;font:inherit;font-size:16px;min-width:200px"><label style="font-size:15px;font-weight:600">أيام التأهل</label><input id="std" type="number" value="${stg.min_days == null ? '' : stg.min_days}" ${dis} style="height:42px;width:90px;border:1.5px solid #bcd9c6;border-radius:10px;text-align:center;font:inherit;font-size:16px"></div></section>
+<ul style="list-style:none;margin:0;padding:0;display:grid;gap:10px">${acts.map(item).join('')}</ul></div>`, 'تحكم كامل في أوراد المراحل', '');
+  document.querySelectorAll('[data-st]').forEach(b => b.onclick = () => viewStages(b.dataset.st));
+  if (ro) return;
+  const sv = async (id, el) => {
+    const li = document.querySelector(`[data-row="${id}"]`), g = f => li.querySelector(`[data-f="${f}"]`), nv = f => { const e = g(f); if (!e || e.value === '') return null; return +e.value; };
+    const row = { tenant_id: TENANT, stage_id: stg.id, activity_id: id, enabled: g('enabled').checked, target_count: nv('target_count'), max_val: nv('max_val'), per_week: nv('per_week'), per_month: nv('per_month'), note: g('note').value.trim() || null };
+    const old = rows[id]; if (old && old.monthly_juz) row.monthly_juz = old.monthly_juz;
+    li.style.borderColor = row.enabled ? '#86b99a' : '#d9e4d6'; li.style.background = row.enabled ? '#f3faf5' : '#fafafa';
+    try { await api('/rest/v1/stage_wird?on_conflict=stage_id,activity_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' }, body: row }); rows[id] = Object.assign(old || {}, row); toast('تم الحفظ'); } catch (e) { toast('تعذّر الحفظ: ' + errAr(e)); }
   };
-  $app.querySelectorAll('[data-ok]').forEach(b => b.onclick = () => act(b.dataset.ok, true));
-  $app.querySelectorAll('[data-no]').forEach(b => b.onclick = () => act(b.dataset.no, false));
+  document.querySelectorAll('[data-sw]').forEach(el => el.onchange = () => sv(el.dataset.sw, el));
+  const sn = async () => { try { await upd('stages', 'id=eq.' + stg.id, { name: document.getElementById('stn').value.trim() || stg.name, min_days: document.getElementById('std').value === '' ? null : +document.getElementById('std').value }); toast('تم الحفظ'); } catch (e) { toast('تعذّر الحفظ: ' + errAr(e)); } };
+  document.getElementById('stn').onchange = sn; document.getElementById('std').onchange = sn;
 }
-async function viewPromotions_old() {
-  const [members, stages, promos] = await Promise.all([q('profiles', 'select=id,full_name,stage_id&role=eq.member&status=eq.active'), q('stages', 'select=*&order=order_index'), q('promotions', 'select=*&order=created_at.desc&limit=30')]);
-  const byId = Object.fromEntries(stages.map(s => [s.id, s])), mById = Object.fromEntries(members.map(m => [m.id, m]));
-  $app.innerHTML = sheikhPage('/sheikh/promotions', 'الترقيات', `${members.length ? members.map(m => { const cur = byId[m.stage_id], next = cur ? stages.find(s => s.order_index > cur.order_index) : null; return `<div class="card"><div class="row sp"><b>${esc(m.full_name)}</b><span class="pill">${esc(cur ? cur.name : 'بدون مرحلة')}</span></div>${cur ? (next ? `<button class="btn sm block" style="margin-top:10px" data-p="${m.id}" data-to="${next.id}">اعتماد الترقية إلى «${esc(next.name)}»</button>` : '<div class="muted small">أعلى مرحلة</div>') : `<button class="btn sec sm block" style="margin-top:10px" data-s="${m.id}">بدء المرحلة الأولى</button>`}</div>`; }).join('') : '<div class="card muted center">لا يوجد أعضاء نشطون.</div>'}
-<h3>سجل الترقيات</h3>${promos.length ? promos.map(p => `<div class="card small">${esc((mById[p.member_id] || {}).full_name || 'عضو')}: ${esc((byId[p.from_stage_id] || {}).name || '—')} ← ${esc((byId[p.to_stage_id] || {}).name || '—')}<div class="muted">${new Date(p.created_at).toLocaleDateString('ar-EG')}</div></div>`).join('') : '<div class="muted">لا توجد ترقيات بعد.</div>'}`);
-  $app.querySelectorAll('[data-p]').forEach(b => b.onclick = async () => { try { await rpc('approve_stage_promotion', { p_member_id: b.dataset.p, p_to_stage_id: b.dataset.to }); toast('تمت الترقية'); viewPromotions(); } catch (e) { toast(errAr(e)); } });
-  $app.querySelectorAll('[data-s]').forEach(b => b.onclick = async () => { try { await rpc('start_member_stage', { p_member_id: b.dataset.s }); toast('تم'); viewPromotions(); } catch (e) { toast(errAr(e)); } });
-}
-async function viewWirdMgmt_old(editId) {
-  const [acts, stg] = await Promise.all([q('wird_activities', 'select=*&order=order_index.asc,created_at.asc'), q('stages', 'select=id,name&order=order_index')]);
-  const e = acts.find(a => a.id === editId) || { type: 'toggle', category: 'worship', is_active: true, order_index: acts.length + 1, quran_unit: 'juz', quran_parts: 1 };
-  const tl = { toggle: 'زر (تم / تراجع)', counter: 'عدّاد', quran: 'قرآن (أجزاء)' };
-  $app.innerHTML = sheikhPage('/sheikh/wird', 'إدارة الأوراد', `<form class="card" id="f"><h3>${editId ? 'تعديل نشاط' : 'نشاط جديد'}</h3>
-<label>العنوان</label><input name="title" required value="${esc(e.title || '')}"><label>الوصف</label><input name="description" value="${esc(e.description || '')}">
-<label>نوع التسجيل</label><select name="type" id="ty">${Object.entries(tl).map(([k, v]) => `<option value="${k}" ${e.type === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
-<label>التصنيف</label><select name="category">${Object.entries(CATS).map(([k, v]) => `<option value="${k}" ${e.category === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
-<div id="cn"><label>الهدف (للعدّاد)</label><input name="target_count" type="number" min="1" value="${e.target_count || ''}"><label>الوحدة (مثال: مرة، ساعة)</label><input name="target_unit" value="${esc(e.target_unit || '')}"></div>
-<div id="qn"><label>وحدة القرآن</label><select name="quran_unit"><option value="juz" ${e.quran_unit === 'juz' ? 'selected' : ''}>جزء</option><option value="pages" ${e.quran_unit === 'pages' ? 'selected' : ''}>صفحة</option></select><label>العدد اليومي</label><input name="quran_parts" type="number" min="1" value="${e.quran_parts || 1}"></div>
-<label>الترتيب</label><input name="order_index" type="number" value="${e.order_index}"><label><input type="checkbox" name="is_active" style="width:auto;margin:0 0 0 8px" ${e.is_active ? 'checked' : ''}> مفعّل</label>
-<div class="err" id="er"></div><div class="row"><button class="btn grow">${editId ? 'حفظ' : 'إضافة'}</button>${editId ? '<button type="button" class="btn sec" id="cx">إلغاء</button>' : ''}</div></form>
-<h3>الأنشطة الحالية</h3>${acts.map(a => `<div class="card"><div class="row sp"><b>${esc(a.title)}</b><span class="pill ${a.is_active ? '' : 'w'}">${a.is_active ? tl[a.type] : 'معطّل'}</span></div><div class="muted small">${CATS[a.category]}${a.type === 'counter' ? ' · الهدف ' + n2a(a.target_count || 0) + ' ' + esc(a.target_unit || '') : ''}${a.type === 'quran' ? ' · ' + n2a(a.quran_parts) + (a.quran_unit === 'pages' ? ' صفحة' : ' جزء') : ''}</div><div class="row" style="margin-top:8px"><button class="btn sec sm" data-e="${a.id}">تعديل</button><button class="btn red sm" data-d="${a.id}">حذف</button></div></div>`).join('')}`);
-  const sync = () => { const t = document.getElementById('ty').value; document.getElementById('cn').hidden = t !== 'counter'; document.getElementById('qn').hidden = t !== 'quran'; }; document.getElementById('ty').onchange = sync; sync();
-  if (editId) document.getElementById('cx').onclick = () => viewWirdMgmt();
-  document.getElementById('f').onsubmit = async ev => {
-    ev.preventDefault(); const f = new FormData(ev.target), t = f.get('type');
-    const row = { stage_id: f.get('stage_id') || null, title: f.get('title').trim(), description: f.get('description').trim() || null, type: t, category: f.get('category'), order_index: +f.get('order_index') || 0, is_active: f.get('is_active') === 'on', target_count: t === 'counter' ? (+f.get('target_count') || 1) : null, target_unit: t === 'counter' ? (f.get('target_unit').trim() || null) : null, quran_unit: t === 'quran' ? f.get('quran_unit') : null, quran_parts: t === 'quran' ? (+f.get('quran_parts') || 1) : null, updated_at: new Date().toISOString() };
-    try { if (editId) await upd('wird_activities', 'id=eq.' + editId, row); else await ins('wird_activities', { ...row, tenant_id: TENANT, icon: 'ri-checkbox-circle-line' }); toast('تم الحفظ'); viewWirdMgmt(); } catch (er) { document.getElementById('er').textContent = errAr(er); }
-  };
-  $app.querySelectorAll('[data-e]').forEach(b => b.onclick = () => { viewWirdMgmt(b.dataset.e); window.scrollTo(0, 0); });
-  $app.querySelectorAll('[data-d]').forEach(b => b.onclick = async () => { if (!confirm('حذف النشاط وكل تسجيلاته؟ يمكنك تعطيله بدل الحذف.')) return; try { await del('wird_activities', 'id=eq.' + b.dataset.d); toast('تم الحذف'); viewWirdMgmt(); } catch (er) { toast(errAr(er)); } });
-}
+
 
 boot();
 
@@ -745,7 +775,7 @@ const SP_CSS = `<style>
 .sp td.ok{background:#dcfce7;color:#166534;font-weight:700}.sp td.no{background:#fee2e2;color:#991b1b;font-weight:700}.sp td.na{color:#94a3b8}
 </style>`;
 function sheikhTabs(a) {
-  const l = [['/sheikh', 'الرئيسية'], ['/sheikh/reports', 'التقارير'], ['/sheikh/members', 'الأعضاء'], ['/sheikh/roster', 'المجموعات'], ['/sheikh/requests', 'الطلبات'], ['/sheikh/promotions', 'الترقيات'], ['/sheikh/wird', 'الأوراد']].filter(x => !(x[0] === '/sheikh/wird' && me && me.role === 'supervisor'));
+  const l = [['/sheikh', 'الرئيسية'], ['/sheikh/reports', 'التقارير'], ['/sheikh/stages', 'المراحل'], ['/sheikh/members', 'الأعضاء'], ['/sheikh/roster', 'المجموعات'], ['/sheikh/requests', 'الطلبات'], ['/sheikh/promotions', 'الترقيات'], ['/sheikh/wird', 'الأوراد']].filter(x => !(x[0] === '/sheikh/wird' && me && me.role === 'supervisor'));
   return '<div class="chips">' + l.map(([p, t]) => `<a class="chip ${a === p ? 'on' : ''}" href="#${p}">${p === '/sheikh/reports' ? '<i class="ri-file-chart-line" style="margin-left:4px"></i>' : ''}${t}</a>`).join('') + '</div>';
 }
 const sheikhPage = (a, title, body, sub, extra) => shell(`${SP_CSS}<div class="sp"><header class="hd"><div><h1>${title}</h1><p>${sub || 'مساحة الشيخ'}</p></div>${extra === undefined ? '<button class="btn0" id="rfb"><i class="ri-refresh-line"></i>تحديث</button>' : extra}</header>${sheikhTabs(a)}${body}</div>`);
@@ -857,93 +887,6 @@ async function viewMember(id) {
 
 /* ---------- reports ---------- */
 const DAYN = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
-async function viewReports(st) {
-  st = st || window.__rp || { mode: 'group', member: '', days: 14 }; window.__rp = st;
-  const [members, acts] = await Promise.all([q('profiles', 'select=id,full_name&role=eq.member&status=eq.active&order=full_name'), loadActivities()]);
-  const to = new Date(), from = new Date(); from.setDate(to.getDate() - st.days + 1);
-  const f = ymd(from), t = ymd(to);
-  const [logs, parts] = await Promise.all([q('wird_logs', `select=member_id,activity_id,log_date,completed,counter_value&log_date=gte.${f}&log_date=lte.${t}&limit=10000`), q('wird_part_logs', `select=member_id,activity_id,log_date,part_index&completed=eq.true&log_date=gte.${f}&log_date=lte.${t}&limit=10000`)]);
-  const dates = []; for (let i = 0; i < st.days; i++) { const d = new Date(to); d.setDate(to.getDate() - i); dates.push(ymd(d)); }
-  const done = (uid, a, date) => {
-    if (a.type === 'quran') return parts.filter(p => p.member_id === uid && p.activity_id === a.id && p.log_date === date).length >= (a.quran_parts || 1);
-    const l = logs.find(x => x.member_id === uid && x.activity_id === a.id && x.log_date === date);
-    if (!l) return false; return a.type === 'counter' ? l.counter_value >= (a.target_count || 1) : !!l.completed;
-  };
-  const main = acts.filter(a => a.category === 'obligations'), other = acts.filter(a => a.category !== 'obligations');
-  const fajr = acts.find(a => /الفجر/.test(a.title));
-  if (!st.member && members[0]) st.member = members[0].id;
-  const dn = ds => { const d = new Date(ds + 'T00:00:00'); return DAYN[d.getDay()] + ' ' + n2a(d.getDate()) + '/' + n2a(d.getMonth() + 1); };
-  const mark = ok => ok ? '<td class="ok">✓</td>' : '<td class="no">✗</td>';
-  const tableFor = list => {
-    if (!list.length) return '';
-    if (st.mode === 'member') return `<table class="rp"><thead><tr><th>اليوم</th>${list.map(a => `<th>${esc(a.title)}</th>`).join('')}</tr></thead><tbody>${dates.map(d => `<tr><td class="dy">${dn(d)}</td>${list.map(a => mark(done(st.member, a, d))).join('')}</tr>`).join('')}</tbody></table>`;
-    return `<table class="rp"><thead><tr><th>العضو</th>${list.map(a => `<th>${esc(a.title)}</th>`).join('')}</tr></thead><tbody>${members.map(m => `<tr><td class="dy">${esc(m.full_name)}</td>${list.map(a => { const n = dates.filter(d => done(m.id, a, d)).length; return `<td class="${n === dates.length ? 'ok' : n === 0 ? 'no' : ''}" style="${n && n < dates.length ? 'background:#fef9c3;color:#854d0e;font-weight:700' : ''}">${n2a(n)}/${n2a(dates.length)}</td>`; }).join('')}</tr>`).join('')}</tbody></table>`;
-  };
-  const pct = (uid, list) => { if (!list.length) return null; let n = 0; list.forEach(a => dates.forEach(d => { if (done(uid, a, d)) n++; })); return Math.round(100 * n / (list.length * dates.length)); };
-  const nawafil = acts.filter(a => a.category === 'worship');
-  const pc = v => v === null ? '—' : n2a(v) + '٪';
-  const pctBox = members.length ? `<section class="panel"><b style="font-size:14px">نسبة الفرائض والنوافل</b><div class="mt">الفرائض = أوراد تصنيف «الفرائض»، النوافل = أوراد تصنيف «العبادات». الحساب: الأيام المسجّلة ÷ (عدد الأوراد × الأيام).</div><div class="tw nx"><table class="rp"><thead><tr><th>العضو</th><th>الفرائض</th><th>النوافل</th></tr></thead><tbody>${members.map(m => `<tr><td class="dy">${esc(m.full_name)}</td><td>${pc(pct(m.id, main))}</td><td>${pc(pct(m.id, nawafil))}</td></tr>`).join('')}</tbody></table></div></section>` : '';
-  let rank = '';
-  if (!fajr) rank = `<section class="panel"><b style="font-size:14px"><i class="ri-trophy-line"></i> ترتيب صلاة الفجر</b><div class="mt">لا يوجد ورد باسم «صلاة الفجر» لتسجيله يوميًا. أضف وردًا بهذا الاسم من «الأوراد» ليظهر الترتيب هنا تلقائيًا من التسجيلات الفعلية.</div></section>`;
-  if (fajr) {
-    const r = members.map(m => ({ n: m.full_name, c: dates.filter(d => done(m.id, fajr, d)).length })).sort((a, b) => b.c - a.c || a.n.localeCompare(b.n, 'ar'));
-    rank = `<section class="panel"><b style="font-size:14px"><i class="ri-trophy-line"></i> ترتيب صلاة الفجر</b><div class="mt">عدد الأيام التي أُدّيت فيها خلال آخر ${n2a(st.days)} يومًا</div>${r.map((x, i) => `<div class="rw" style="padding:8px 0;border-top:1px solid oklch(var(--background-200));margin-top:${i ? 0 : 8}px"><span style="font-size:13px"><b style="display:inline-block;width:22px;color:oklch(var(--primary-700))">${n2a(i + 1)}</b>${esc(x.n)}</span><span class="bd ${x.c ? '' : 'w'}">${n2a(x.c)} / ${n2a(dates.length)}</span></div>`).join('')}</section>`;
-  }
-  const who = st.mode === 'member' ? (members.find(m => m.id === st.member) || {}).full_name || '' : 'كل أعضاء الحلقة';
-  window.__rpData = { who, days: st.days, from: f, to: t, main, other, tableHtml: tableFor, rows: null };
-  $app.innerHTML = sheikhPage('/sheikh/reports', 'التقارير', `<section class="panel" style="margin-top:14px"><div class="pills" style="margin:0"><button class="pl ${st.mode === 'group' ? 'on' : ''}" data-m="group"><i class="ri-group-line"></i>الحلقة كلها</button><button class="pl ${st.mode === 'member' ? 'on' : ''}" data-m="member"><i class="ri-user-line"></i>عضو واحد</button></div>${st.mode === 'member' ? `<select class="it" id="rm" style="margin-top:10px">${members.map(m => `<option value="${m.id}" ${m.id === st.member ? 'selected' : ''}>${esc(m.full_name)}</option>`).join('')}</select>` : ''}<select class="it" id="rd" style="margin-top:10px">${[7, 14, 30].map(n => `<option value="${n}" ${st.days === n ? 'selected' : ''}>آخر ${n2a(n)} يومًا</option>`).join('')}</select><div class="rw" style="margin-top:12px;gap:8px"><button class="btn1" style="flex:1" id="xpdf"><i class="ri-file-pdf-2-line"></i>تصدير PDF</button><button class="btn1 sec" style="flex:1" id="xpng"><i class="ri-image-line"></i>تصدير صورة</button></div></section>
-${members.length ? `<h3>الفرائض والعبادات الأساسية</h3><div class="tw">${tableFor(main) || '<div class="em">لا توجد أوراد في هذا التصنيف.</div>'}</div>${pctBox}${rank}${other.length ? `<h3>باقي الأوراد</h3><div class="tw">${tableFor(other)}</div>` : ''}<section class="panel"><b style="font-size:14px">الورد الموسمي</b><div class="mt">لا يوجد ورد موسمي مسجّل بعد. يظهر هنا تلقائيًا عند تفعيل موسم.</div></section>` : emptyBox('ri-file-chart-line', 'لا يوجد أعضاء مفعّلون', 'تظهر التقارير بعد تفعيل الأعضاء وتسجيلهم.')}`, 'جدول تلقائي بعلامات ✓ و ✗ لما سجّله كل عضو في كل ورد. البيانات من التسجيلات الفعلية فقط.');
-  bindRefresh(() => viewReports(st));
-  document.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { st.mode = b.dataset.m; viewReports(st); });
-  const rm = document.getElementById('rm'); if (rm) rm.onchange = e => { st.member = e.target.value; viewReports(st); };
-  document.getElementById('rd').onchange = e => { st.days = +e.target.value; viewReports(st); };
-  document.getElementById('xpdf').onclick = () => exportPdf();
-  document.getElementById('xpng').onclick = () => exportPng();
-}
-function reportDoc() {
-  const R = window.__rpData, el = document.querySelectorAll('.sp .tw:not(.nx)');
-  const title = `تقرير الورد، ${R.who}`;
-  const sub = `من ${R.from} إلى ${R.to}`;
-  return { title, sub, tables: [...el].map(e => e.innerHTML), heads: ['الفرائض والعبادات الأساسية', 'باقي الأوراد'] };
-}
-function exportPdf() {
-  const d = reportDoc();
-  const w = window.open('', '_blank'); if (!w) return toast('اسمح بالنوافذ المنبثقة');
-  w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${d.title}</title><style>@page{size:A4 landscape;margin:12mm}body{font-family:Tahoma,'Noto Naskh Arabic','Noto Sans Arabic',Arial,sans-serif;color:#0f2a1d}h1{font-size:20px;margin:0}p{margin:4px 0 14px;color:#555;font-size:12px}h2{font-size:14px;margin:16px 0 6px;color:#14532d}table{border-collapse:collapse;width:100%;font-size:11px}th{background:#14532d;color:#fff;padding:6px;border:1px solid #0f3d24}td{padding:5px;text-align:center;border:1px solid #cbd5c8}td.dy{background:#f1f5ef;font-weight:700}td.ok{background:#dcfce7;color:#166534;font-weight:700}td.no{background:#fee2e2;color:#991b1b;font-weight:700}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}</style></head><body><h1>مُتَرَبِّي · ${d.title}</h1><p>${d.sub}</p>${d.tables.map((t, i) => `<h2>${d.heads[i] || ''}</h2><table>${t.replace(/^<table class="rp">|<\/table>$/g, '')}</table>`).join('')}<script>setTimeout(function(){window.print()},400)<\/script></body></html>`);
-  w.document.close();
-}
-function exportPng() {
-  const d = reportDoc(), tabs = [...document.querySelectorAll('.sp .tw:not(.nx) table.rp')];
-  const FONT = '"Noto Sans Arabic","Tajawal",Tahoma,Arial,sans-serif', cw = 96, rh = 34, fw = 120, pad = 24;
-  const maxc = Math.max(...tabs.map(t => t.rows[0].cells.length));
-  const W = pad * 2 + fw + (maxc - 1) * cw;
-  let H = pad + 70; tabs.forEach(t => H += 40 + t.rows.length * rh + 14); H += 40;
-  const cv = document.createElement('canvas'); cv.width = W * 2; cv.height = H * 2; const c = cv.getContext('2d'); c.scale(2, 2); c.direction = 'rtl'; c.textAlign = 'center'; c.textBaseline = 'middle';
-  c.fillStyle = '#fbf8ef'; c.fillRect(0, 0, W, H);
-  c.fillStyle = '#14532d'; c.fillRect(0, 0, W, 62); c.fillStyle = '#fff'; c.font = `700 20px ${FONT}`; c.textAlign = 'right'; c.fillText('مُتَرَبِّي · ' + d.title, W - pad, 24); c.font = `13px ${FONT}`; c.fillStyle = '#d8f3e3'; c.fillText(d.sub, W - pad, 46); c.textAlign = 'center';
-  let y = 78;
-  tabs.forEach((t, ti) => {
-    c.fillStyle = '#14532d'; c.font = `700 14px ${FONT}`; c.textAlign = 'right'; c.fillText(d.heads[ti] || '', W - pad, y + 10); c.textAlign = 'center'; y += 24;
-    [...t.rows].forEach((r, ri) => {
-      [...r.cells].forEach((cell, ci) => {
-        const w = ci === 0 ? fw : cw, x = W - pad - (ci === 0 ? fw : fw + ci * cw);
-        const cls = cell.className; let bg = '#fff', fg = '#0f2a1d';
-        if (ri === 0) { bg = '#14532d'; fg = '#fff'; } else if (ci === 0) bg = '#eef3ea'; else if (cls.includes('ok')) { bg = '#dcfce7'; fg = '#166534'; } else if (cls.includes('no')) { bg = '#fee2e2'; fg = '#991b1b'; } else if (cell.style.background) { bg = '#fef9c3'; fg = '#854d0e'; }
-        c.fillStyle = bg; c.fillRect(x, y, w, rh); c.strokeStyle = '#cfd8c9'; c.strokeRect(x, y, w, rh);
-        c.fillStyle = fg; c.font = `${ri === 0 || ci === 0 || cls ? '700 ' : ''}12px ${FONT}`; c.fillText(cell.textContent.trim(), x + w / 2, y + rh / 2, w - 8);
-      });
-      y += rh;
-    });
-    y += 16;
-  });
-  c.fillStyle = '#6b7a6f'; c.font = `11px ${FONT}`; c.fillText('أُنشئ تلقائيًا من تسجيلات الورد في مُتَرَبِّي', W / 2, H - 16);
-  const url = cv.toDataURL('image/png');
-  const o = document.createElement('div'); o.style.cssText = 'position:fixed;inset:0;z-index:99;background:rgba(0,0,0,.7);overflow:auto;padding:16px';
-  o.innerHTML = `<div style="background:#fff;border-radius:14px;padding:12px;max-width:560px;margin:0 auto"><img src="${url}" style="width:100%;border-radius:8px"><div style="display:flex;gap:8px;margin-top:10px"><a id="dl" download="تقرير-الورد.png" href="${url}" style="flex:1;text-align:center;background:#166534;color:#fff;padding:10px;border-radius:8px;text-decoration:none;font-size:13px">حفظ الصورة</a><button id="sh" style="flex:1;border:1px solid #166534;color:#166534;background:#fff;border-radius:8px;font:inherit;font-size:13px">مشاركة</button><button id="cl" style="border:1px solid #ccc;background:#fff;border-radius:8px;padding:0 14px">إغلاق</button></div></div>`;
-  document.body.appendChild(o);
-  o.querySelector('#cl').onclick = () => o.remove();
-  o.querySelector('#sh').onclick = async () => { try { const b = await (await fetch(url)).blob(), file = new File([b], 'report.png', { type: 'image/png' }); if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: d.title }); else toast('المشاركة غير مدعومة، استخدم حفظ الصورة'); } catch (e) { } };
-}
 
 /* ---------- reports v2 (sheet-style) ---------- */
 const HJ = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', { day: 'numeric' });
