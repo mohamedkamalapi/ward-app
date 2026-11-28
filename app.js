@@ -1204,3 +1204,201 @@ function exportPng() {
   document.body.appendChild(o); o.querySelector('#cl').onclick = () => o.remove();
   o.querySelector('#sh').onclick = async () => { try { const b = await (await fetch(url)).blob(), file = new File([b], 'report.png', { type: 'image/png' }); if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: d.title }); else toast('المشاركة غير مدعومة، استخدم حفظ الصورة'); } catch (e) { } };
 }
+
+/* ===== V2 design system (overrides earlier definitions) ===== */
+(function () {
+  const css = `
+html,body{background:#F3F5F7!important}
+.v2{font-family:var(--font-body);color:#0F1E1B;font-size:17px;line-height:1.7;min-height:100dvh;background:#F3F5F7}
+.v2 *{box-sizing:border-box}
+.v2 h1,.v2 h2,.v2 h3,.v2 p{margin:0}
+.v2-top{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.94);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-bottom:1px solid #E3E8EB;padding:10px 16px;padding-top:calc(10px + env(safe-area-inset-top));display:flex;align-items:center;justify-content:space-between;gap:10px}
+.v2-brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:#0F1E1B;font-weight:800;font-size:21px}
+.v2-logo{width:40px;height:40px;border-radius:12px;background:linear-gradient(145deg,#0F6B5C,#0B4F44);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700}
+.v2-tools{display:flex;align-items:center;gap:8px}
+.v2-ib{width:44px;height:44px;border-radius:50%;border:1px solid #E3E8EB;background:#fff;color:#33454B;display:flex;align-items:center;justify-content:center;font-size:21px;cursor:pointer;position:relative;text-decoration:none;font-family:inherit}
+.v2-av{background:#E4F2EF;color:#0B4F44;font-weight:800;font-size:18px;border-color:#CBE5DF}
+.v2-dot{position:absolute;top:-3px;left:-3px;min-width:20px;height:20px;border-radius:10px;background:#0F6B5C;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px}
+.v2-main{max-width:760px;margin:0 auto;padding:18px 16px 120px;display:grid;gap:16px}
+.v2-card{background:#fff;border:1px solid #E3E8EB;border-radius:20px;padding:18px;box-shadow:0 1px 2px rgba(15,30,27,.04),0 8px 24px rgba(15,30,27,.04)}
+.v2-h1{font-size:28px;font-weight:800;line-height:1.35}
+.v2-h2{font-size:21px;font-weight:800;line-height:1.4}
+.v2-sub{font-size:15px;color:#52626A;line-height:1.6}
+.v2-date{font-size:15px;color:#52626A;font-weight:600}
+.v2-hero{background:linear-gradient(150deg,#0F6B5C 0%,#0B4F44 100%);color:#fff;border-radius:24px;padding:22px;box-shadow:0 12px 30px rgba(11,79,68,.28);display:grid;gap:18px}
+.v2-hero p{color:#D5EEE8}
+.v2-hero-row{display:flex;align-items:center;gap:18px}
+.v2-ring{position:relative;width:104px;height:104px;flex:none}
+.v2-ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.v2-ring .c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1}
+.v2-ring b{font-size:30px;font-weight:800}.v2-ring small{font-size:14px;opacity:.85;margin-top:2px}
+.v2-btn{display:flex;align-items:center;justify-content:center;gap:8px;height:56px;border-radius:16px;font-size:18px;font-weight:800;text-decoration:none;border:0;cursor:pointer;font-family:inherit;width:100%}
+.v2-btn.w{background:#fff;color:#0B4F44}
+.v2-btn.p{background:#0F6B5C;color:#fff}
+.v2-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.v2-stat{background:#fff;border:1px solid #E3E8EB;border-radius:18px;padding:14px 8px;text-align:center}
+.v2-stat i{font-size:24px;color:#0F6B5C}.v2-stat b{display:block;font-size:26px;font-weight:800;line-height:1.2;margin-top:4px}.v2-stat span{font-size:14px;color:#52626A;font-weight:600}
+.v2-row{display:flex;align-items:center;gap:12px;padding:14px 4px;border-top:1px solid #EEF1F3;text-decoration:none;color:#0F1E1B;font-size:17px;font-weight:600}
+.v2-row:first-of-type{border-top:0}
+.v2-row .o{width:24px;height:24px;border-radius:50%;border:2.5px solid #A9BDB8;flex:none}
+.v2-row .t{flex:1}.v2-row i.ch{color:#8A9AA0;font-size:20px}
+.v2-quick{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.v2-q{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid #E3E8EB;border-radius:18px;padding:14px;text-decoration:none;color:#0F1E1B;font-size:17px;font-weight:700}
+.v2-q .ic{width:44px;height:44px;border-radius:13px;background:#E4F2EF;color:#0F6B5C;display:flex;align-items:center;justify-content:center;font-size:23px;flex:none}
+.v2-note{display:flex;gap:12px;align-items:flex-start;background:#E4F2EF;border:1px solid #CBE5DF;border-radius:18px;padding:14px}
+.v2-note .ic{width:40px;height:40px;border-radius:12px;background:#fff;color:#0F6B5C;display:flex;align-items:center;justify-content:center;font-size:21px;flex:none}
+.v2-note b{font-size:17px;color:#0B4F44}.v2-note p{font-size:15px;color:#2B4A45}
+.v2-picker{display:grid;gap:8px}
+.v2-picker label{font-size:15px;font-weight:700;color:#33454B}
+.v2-picker select{height:52px;border:1.5px solid #D5DDE0;border-radius:14px;background:#fff;font:inherit;font-size:17px;font-weight:700;padding:0 12px;color:#0F1E1B;width:100%}
+.v2-sum{display:grid;gap:14px}
+.v2-sum-top{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:15px;color:#52626A;font-weight:600}
+.v2-pill{display:inline-flex;align-items:center;gap:6px;border:1px solid #D5DDE0;background:#fff;color:#0B4F44;border-radius:999px;padding:7px 14px;font-size:14px;font-weight:700;text-decoration:none}
+.v2-sum-body{display:flex;align-items:center;gap:16px}
+.v2-sum .v2-ring{width:92px;height:92px;color:#0F1E1B}
+.v2-mini{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.v2-mini div{border-radius:14px;padding:10px 4px;text-align:center;background:#F3F5F7}
+.v2-mini div.a{background:#E4F2EF;color:#0B4F44}
+.v2-mini b{display:block;font-size:22px;font-weight:800;line-height:1.2}.v2-mini span{font-size:14px;font-weight:600}
+.v2-lock{font-size:14px;color:#52626A;display:flex;gap:8px;align-items:flex-start;line-height:1.6}
+.v2-sec{display:grid;gap:10px}
+.v2-sec-h{display:flex;align-items:flex-end;justify-content:space-between;padding:0 4px}
+.v2-sec-h .c{font-size:15px;font-weight:700;color:#0F6B5C;background:#E4F2EF;border-radius:999px;padding:2px 12px}
+.v2-act{background:#fff;border:1.5px solid #E3E8EB;border-radius:20px;padding:14px;display:grid;gap:12px}
+.v2-act.done{border-color:#9FD3C8;background:#F3FAF8}
+.v2-act-h{display:flex;align-items:center;gap:12px}
+.v2-ico{width:46px;height:46px;border-radius:14px;background:#F0F3F5;color:#52626A;display:flex;align-items:center;justify-content:center;font-size:23px;flex:none}
+.done .v2-ico{background:#D5EEE8;color:#0B4F44}
+.v2-act-t{flex:1;min-width:0}
+.v2-act-t h3{font-size:18px;font-weight:700;line-height:1.5}
+.v2-act-t p{font-size:14.5px;color:#52626A;line-height:1.55}
+.v2-check{width:52px;height:52px;border-radius:50%;flex:none;cursor:pointer;display:flex;align-items:center;justify-content:center;border:2.5px solid #A9BDB8;background:#fff;color:#fff;font-size:28px;font-family:inherit;padding:0}
+.v2-check[aria-pressed=true]{background:#0F6B5C;border-color:#0F6B5C}
+.v2-check i{opacity:0}.v2-check[aria-pressed=true] i{opacity:1}
+.v2-inp{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#F3F5F7;border-radius:16px;padding:12px}
+.v2-inp label{font-size:16px;font-weight:700;flex:1}
+.v2-inp input{width:104px;height:52px;text-align:center;border:1.5px solid #C6D2D6;border-radius:14px;font:inherit;font-size:22px;font-weight:800;background:#fff;color:#0F1E1B}
+.v2-cnt{display:flex;align-items:center;gap:14px;background:#F3F5F7;border-radius:16px;padding:12px}
+.v2-cnt .big{width:72px;height:72px;border-radius:50%;flex:none;cursor:pointer;display:flex;align-items:center;justify-content:center;border:3px solid #0F6B5C;background:#fff;color:#0B4F44;font:inherit;font-size:28px;font-weight:800;padding:0}
+.v2-cnt .big.on{background:#0F6B5C;color:#fff}
+.v2-cnt .tx{flex:1;min-width:0}.v2-cnt .tx b{font-size:17px}.v2-cnt .tx p{font-size:14px;color:#52626A}
+.v2-undo{border:1px solid #C6D2D6;background:#fff;color:#33454B;border-radius:12px;padding:10px 12px;font:inherit;font-size:14px;font-weight:700;cursor:pointer}
+.v2-bar{height:8px;border-radius:99px;background:#E3E8EB;overflow:hidden}.v2-bar>i{display:block;height:100%;border-radius:99px;background:#0F6B5C}
+.v2-parts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.v2-part{display:flex;align-items:center;justify-content:space-between;gap:8px;border:1.5px solid #D5DDE0;background:#fff;border-radius:14px;padding:12px;font:inherit;font-size:16px;font-weight:700;color:#33454B;cursor:pointer}
+.v2-part.on{background:#D5EEE8;border-color:#0F6B5C;color:#0B4F44}
+.v2-juz{background:#F3F5F7;border-radius:16px;padding:12px;display:grid;gap:8px}
+.v2-bn{position:fixed;inset:auto 0 0 0;z-index:40;background:rgba(255,255,255,.96);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-top:1px solid #E3E8EB;display:flex;justify-content:space-around;padding:6px 6px calc(8px + env(safe-area-inset-bottom))}
+.v2-bn a{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 2px;text-decoration:none;color:#667880;font-size:13px;font-weight:700;min-width:0}
+.v2-bn a i{font-size:25px;line-height:1.1;width:56px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:17px}
+.v2-bn a.on{color:#0B4F44}.v2-bn a.on i{background:#D5EEE8}
+.v2-side{display:none}
+.v2-hub{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.v2-hub a{display:flex;flex-direction:column;gap:8px;background:#fff;border:1px solid #E3E8EB;border-radius:20px;padding:16px;text-decoration:none;color:#0F1E1B;box-shadow:0 1px 2px rgba(15,30,27,.04)}
+.v2-hub .ic{width:50px;height:50px;border-radius:15px;background:#E4F2EF;color:#0F6B5C;display:flex;align-items:center;justify-content:center;font-size:26px}
+.v2-hub b{font-size:18px;font-weight:800}.v2-hub span.s{font-size:14.5px;color:#52626A;line-height:1.5}
+@media(min-width:1024px){
+ .v2-bn{display:none}.v2-main{max-width:980px;padding-bottom:60px}
+ .v2-wrap{display:flex;flex-direction:row-reverse;justify-content:flex-end}
+ .v2-side{display:flex;flex-direction:column;gap:6px;width:264px;flex:none;background:#fff;border-left:1px solid #E3E8EB;min-height:100dvh;position:sticky;top:0;align-self:flex-start;padding:20px 14px}
+ .v2-side a{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;text-decoration:none;color:#33454B;font-size:17px;font-weight:700}
+ .v2-side a i{font-size:22px}.v2-side a.on{background:#E4F2EF;color:#0B4F44}.v2-side a:hover{background:#F3F5F7}
+ .v2-col{flex:1;min-width:0}
+}
+`;
+  const st = document.createElement('style'); st.id = 'v2css'; st.textContent = css; document.head.appendChild(st);
+})();
+
+const V2_ICONS = { '/': 'ri-home-5-line', '/ward': 'ri-checkbox-circle-line', '/progress': 'ri-bar-chart-2-line', '/group': 'ri-team-line', '/sheikh/reports': 'ri-table-line', '/sheikh': 'ri-apps-2-line', '/settings': 'ri-settings-4-line', '/seasons': 'ri-calendar-event-line' };
+function v2Nav(all) {
+  const staff = isStaff();
+  const main = staff ? [['/', 'الرئيسية'], ['/ward', 'وردي'], ['/sheikh/reports', 'الجداول'], ['/sheikh', 'الإدارة'], ['/settings', 'الإعدادات']] : [['/', 'الرئيسية'], ['/ward', 'وردي'], ['/progress', 'تقدمي'], ['/group', 'مجموعتي'], ['/settings', 'الإعدادات']];
+  if (!all) return main;
+  const extra = staff ? [['/progress', 'تقدمي'], ['/seasons', 'المواسم'], ['/group', 'مجموعتي']] : [['/seasons', 'المواسم']];
+  return main.slice(0, -1).concat(extra, main.slice(-1));
+}
+function shell(inner, opts = {}) {
+  const r = route, init = esc((me.full_name || 'م').trim()[0] || 'م');
+  const lnk = (arr, cls) => arr.map(([p, l]) => { const on = navOn(r, p); return `<a href="#${p}" class="${on ? 'on' : ''}"><i class="${V2_ICONS[p] || 'ri-circle-line'}"></i><span>${l}</span></a>`; }).join('');
+  const notes = NOTIFS.map(([ic, cl, t, s, w, u]) => `<li class="flex gap-3 px-4 py-3"><span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md ${cl}"><i class="${ic} text-base"></i></span><div class="min-w-0 flex-1"><p style="font-size:15px;font-weight:700;line-height:1.5">${t}</p><p style="font-size:14px;color:#52626A;line-height:1.55">${s}</p><p style="font-size:12.5px;color:#8A9AA0">${w}</p></div></li>`).join('');
+  return `<div class="v2"><div class="v2-wrap"><aside class="v2-side"><a href="#/" style="padding:6px 10px 16px"><span class="v2-logo">م</span><span style="font-size:22px;font-weight:800;color:#0F1E1B">مُتَرَبِّي</span></a>${lnk(v2Nav(true))}</aside>
+<div class="v2-col"><header class="v2-top"><a class="v2-brand" href="#/"><span class="v2-logo">م</span><span>مُتَرَبِّي</span></a><div class="v2-tools">${roleBadge()}
+<div style="position:relative"><button type="button" id="bellb" class="v2-ib" aria-label="الإشعارات"><i class="ri-notification-3-line"></i><span class="v2-dot">3</span></button>
+<div id="bellp" style="display:none"><div id="bello" style="position:fixed;inset:0;z-index:40"></div><div style="position:fixed;left:12px;right:12px;top:68px;z-index:50;background:#fff;border:1px solid #E3E8EB;border-radius:20px;overflow:hidden;box-shadow:0 20px 50px rgba(15,30,27,.18);max-width:420px;margin-inline:auto"><div class="flex items-center justify-between px-4 py-3" style="border-bottom:1px solid #E3E8EB"><div><p style="font-size:18px;font-weight:800">الإشعارات</p><p style="font-size:14px;color:#52626A">آخر التحديثات على وردك</p></div><button type="button" id="bellc" class="v2-ib" style="width:38px;height:38px;font-size:19px" aria-label="إغلاق"><i class="ri-close-line"></i></button></div><ul style="list-style:none;margin:0;padding:0;max-height:60vh;overflow-y:auto">${notes}</ul><p style="padding:10px;text-align:center;font-size:13px;color:#8A9AA0;background:#F3F5F7">عيّنة توضيحية: الإشعارات الحقيقية تأتي مع تفعيل التذكيرات</p></div></div></div>
+<a class="v2-ib v2-av" href="#/more" aria-label="حسابي">${init}</a></div></header>
+<main class="v2-main">${inner}</main></div></div>
+<nav class="v2-bn">${lnk(v2Nav(false))}</nav></div>`;
+}
+function draw(inner) { $app.innerHTML = shell(inner); window.scrollTo(0, 0); bellOpen = false; }
+
+function v2Ring(done, total, color, track, num) {
+  const R = 44, C = 2 * Math.PI * R, P = total ? done / total : 0;
+  return `<div class="v2-ring" role="img" aria-label="${n2a(done)} من ${n2a(total)}"><svg viewBox="0 0 104 104"><circle cx="52" cy="52" r="${R}" fill="none" stroke="${track}" stroke-width="9"/><circle cx="52" cy="52" r="${R}" fill="none" stroke="${color}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C * (1 - P)).toFixed(1)}"/></svg><div class="c">${num}</div></div>`;
+}
+function dateCard() { return ''; }
+function whiteBanner() {
+  const q0 = new URLSearchParams(location.search).get('hj'), hd = q0 ? +q0 : hjDay(new Date()); let t = '', s = '';
+  if (hd === 11 || hd === 12) { t = 'الأيام البيض تبدأ ' + (hd === 12 ? 'غدًا' : 'بعد غدٍ'); s = 'الثالث عشر والرابع عشر والخامس عشر من الشهر الهجري. نوِ الصيام من الآن.'; }
+  else if (hd >= 13 && hd <= 15) { t = 'اليوم من الأيام البيض (' + n2a(hd) + ' هجري)'; s = 'صيام ثلاثة أيام من كل شهر سنّة مؤكدة. سجّل صيامك في ورد اليوم.'; }
+  else return '';
+  return `<div class="v2-note" role="status"><span class="ic"><i class="ri-moon-line"></i></span><div><b>${t}</b><p>${s}</p></div></div>`;
+}
+async function viewHome() {
+  await loadMeCtx();
+  const [acts, day] = await Promise.all([loadMyActs(), loadDay(me.id, today())]);
+  const [st, active] = await Promise.all([stats(acts), activeCount()]);
+  const states = acts.map(a => [a, actState(a, day)]), total = acts.length, done = states.filter(s => s[1].done).length, left = states.filter(s => !s[1].done);
+  const nm = (me.full_name || '').trim().split(/\s+/)[0] || '';
+  const d = new Date(), hij = fH.format(d).replace(/\u200f?\s?هـ?$/, '') + ' هـ';
+  const stat = (ic, v, l) => `<div class="v2-stat"><i class="${ic}"></i><b class="num">${v}</b><span>${l}</span></div>`;
+  const q = (h, ic, t) => `<a class="v2-q" href="#${h}"><span class="ic"><i class="${ic}"></i></span>${t}</a>`;
+  draw(`<div><p class="v2-date">${fW.format(d)} · ${hij} · ${fGD.format(d)}</p><h1 class="v2-h1" style="margin-top:4px">السلام عليكم، ${esc(nm)}</h1></div>
+${whiteBanner()}
+<section class="v2-hero"><div class="v2-hero-row">${v2Ring(done, total, '#fff', 'rgba(255,255,255,.25)', `<b class="num">${n2a(done)}<span style="font-size:18px;opacity:.8">/${n2a(total)}</span></b><small>تم اليوم</small>`)}<div style="min-width:0"><h2 class="v2-h2" style="color:#fff">ورد اليوم</h2><p style="font-size:16px;margin-top:4px">${total ? (left.length ? `متبقي ${n2a(left.length)} من ${n2a(total)} أوراد` : 'ما شاء الله، أتممت ورد اليوم كله. ثبّتك الله.') : 'لا توجد أوراد لمرحلتك بعد.'}</p></div></div><a class="v2-btn w" href="#/ward"><i class="ri-checkbox-circle-line" style="font-size:24px"></i>سجّل ورد اليوم</a></section>
+<div class="v2-stats">${stat('ri-fire-line', n2a(st.streak), 'أيام متتالية')}${stat('ri-checkbox-circle-line', n2a(done) + '/' + n2a(total), 'أوراد اليوم')}${stat('ri-team-line', n2a(active), 'أعضاء نشطون')}</div>
+${left.length ? `<section class="v2-card"><h2 class="v2-h2" style="margin-bottom:6px">المتبقي من وردك</h2>${left.slice(0, 6).map(([a]) => `<a class="v2-row" href="#/ward"><span class="o"></span><span class="t">${esc(a.title)}</span><i class="ri-arrow-left-s-line ch"></i></a>`).join('')}${left.length > 6 ? `<p class="v2-sub" style="margin-top:8px">و${n2a(left.length - 6)} أوراد أخرى في صفحة وردي.</p>` : ''}</section>` : ''}
+<div class="v2-quick">${q('/progress', 'ri-bar-chart-2-line', 'تقدمي')}${q('/seasons', 'ri-calendar-event-line', 'المواسم')}${q('/group', 'ri-team-line', 'مجموعتي')}${q('/ward/history', 'ri-history-line', 'سجل الشهر')}</div>`);
+}
+function juzBlock(a) {
+  if (!a.monthly_juz) return ''; const l = ctx.day.logs.find(x => x.activity_id === a.id), td = l && l.qiyam_juz ? +l.qiyam_juz : 0, tot = ctx.juzOther + td, P = Math.min(100, pct(tot, a.monthly_juz));
+  return `<div class="v2-juz"><div class="v2-inp" style="padding:0;background:none"><label for="jz">كم جزءًا قرأت في قيامك اليوم؟</label><input id="jz" data-j="${a.id}" type="number" inputmode="decimal" min="0" max="30" step="0.5" value="${td || ''}" placeholder="٠"></div><p class="v2-sub">ختمة القيام هذا الشهر: <b class="num">${n2a(tot)}</b> من ${n2a(a.monthly_juz)} جزءًا${tot >= a.monthly_juz ? ' · ما شاء الله، تمّت الختمة' : ''}</p><div class="v2-bar"><i style="width:${P}%"></i></div></div>`;
+}
+function wardArticle(a) {
+  const st = actState(a, ctx.day), done = st.done, ic = iconFor(a);
+  const head = (right) => `<div class="v2-act-h"><span class="v2-ico"><i class="${ic}"></i></span><div class="v2-act-t"><h3>${esc(a.title)}</h3>${a.description ? `<p>${esc(a.description)}</p>` : ''}<p class="num">${meta(a)}${done ? ' · مكتمل' : ''}</p></div>${right || ''}</div>`;
+  const wrap = body => `<article class="v2-act ${done ? 'done' : ''}">${body}</article>`;
+  if (a.type === 'toggle') return wrap(head(`<button type="button" class="v2-check" data-a="${a.id}" data-k="t" aria-pressed="${done}" aria-label="${done ? 'إلغاء تسجيل ' : 'تسجيل '}${esc(a.title)}"><i class="ri-check-line"></i></button>`));
+  if (st.typed) return wrap(head() + `<div class="v2-inp"><label for="nv${a.id.slice(0, 4)}">اكتب العدد الذي ذكرته <span style="font-weight:500;color:#52626A">(الهدف ${n2a(st.total)})</span></label><input id="nv${a.id.slice(0, 4)}" data-nv="${a.id}" type="number" inputmode="numeric" min="0" max="100000" step="1" value="${st.val || ''}" placeholder="٠"></div>`);
+  if (st.sleep) return wrap(head() + `<div class="v2-inp"><label for="sl">كم ساعة نمت؟ <span style="font-weight:500;color:#52626A">(الحد الأقصى ${n2a(st.total)})</span></label><input id="sl" data-h="${a.id}" type="number" inputmode="decimal" min="0" max="24" step="0.5" value="${st.val || ''}" placeholder="٠"></div>`);
+  if (a.type === 'counter') { const stp = stepOf(a); return wrap(head() + `<div class="v2-cnt"><button type="button" class="big ${done ? 'on' : ''}" data-a="${a.id}" data-k="p" aria-label="تسجيل ${esc(a.title)}">${n2a(st.val)}</button><div class="tx"><b>${n2a(st.val)} من ${n2a(st.total)} ${esc(UNIT(a))}</b><p>اضغط الدائرة لتسجيل ${n2a(stp)} ${esc(UNIT(a))}</p></div><button type="button" class="v2-undo" data-a="${a.id}" data-k="m" ${st.val <= 0 ? 'disabled' : ''} aria-label="تراجع" style="opacity:${st.val <= 0 ? .4 : 1}">تراجع</button></div><div class="v2-bar"><i style="width:${Math.min(100, pct(st.val, st.total))}%"></i></div>`); }
+  const lbl = a._half ? 'نصف جزء' : a.quran_unit === 'pages' ? 'الصفحة' : 'الجزء';
+  return wrap(head() + `<p class="v2-sub num">سجّلت ${n2a(st.val)} من ${n2a(st.total)}</p>${ctx.qr ? '' : `<div class="v2-parts">${Array.from({ length: st.total }, (_, i) => { const on = st.got.includes(i); return `<button type="button" class="v2-part ${on ? 'on' : ''}" data-a="${a.id}" data-k="q" data-i="${i}" aria-pressed="${on}"><span>${a._half ? lbl : lbl + ' ' + n2a(i + 1)}</span><i class="ri-${on ? 'checkbox-circle-fill' : 'checkbox-blank-circle-line'}"></i></button>`; }).join('')}</div>`}<div class="v2-bar"><i style="width:${pct(st.val, st.total)}%"></i></div>${ctx.qr && a === ctx.acts.find(x => x.type === 'quran') ? '<div id="qp"></div>' : ''}`);
+}
+function wardPicker() {
+  if (!isStaff() || !ctx.pm) return '';
+  return `<div class="v2-card v2-picker"><label for="wp">اختر العضو لعرض وِرده</label><select id="wp"><option value="">أنا (حسابي)</option>${ctx.pm.map(m => `<option value="${m.id}" ${window.__wardFor === m.id ? 'selected' : ''}>${esc(m.full_name)}</option>`).join('')}</select></div>`;
+}
+async function viewWard() {
+  await loadPicker();
+  if (isStaff() && window.__wardFor && ctx.pm && ctx.pm.some(m => m.id === window.__wardFor)) return await viewWardOf(window.__wardFor);
+  window.__wardFor = null;
+  const [acts, day] = await Promise.all([loadMyActs(), loadDay(me.id, today())]);
+  ctx.acts = acts; ctx.day = day; ctx.juzOther = 0; ctx.wardFast = false; ctx.qr = null; if (acts.some(a => a.type === 'quran')) { try { await qpLoad(); } catch (e) { } }
+  if (acts.some(a => a.monthly_juz)) { try { const t0 = new Date(); t0.setDate(t0.getDate() - (hjDay(t0) - 1)); const rows = await q('wird_logs', `select=log_date,qiyam_juz&member_id=eq.${me.id}&log_date=gte.${ymd(t0)}&log_date=lt.${today()}&qiyam_juz=gt.0`); ctx.juzOther = rows.reduce((a, r) => a + (+r.qiyam_juz || 0), 0); } catch (e) { } }
+  const paint = () => {
+    const sts = acts.map(a => actState(a, ctx.day)), done = sts.filter(s => s.done).length, partial = sts.filter(s => !s.done && s.val > 0).length, total = acts.length, rem = total - done, d = new Date();
+    const sec = CAT_ORDER.map(c => { const l = acts.filter(a => a.category === c); if (!l.length) return ''; const dn = l.filter(a => actState(a, ctx.day).done).length; return `<section class="v2-sec"><div class="v2-sec-h"><div><h2 class="v2-h2">${CATS[c]}</h2><p class="v2-sub">${CAT_SUB[c]}</p></div><span class="c num">${n2a(dn)}/${n2a(l.length)}</span></div>${l.map(wardArticle).join('')}</section>`; }).join('');
+    const y = window.scrollY;
+    const HTML = wardPicker() + whiteBanner() + `<section class="v2-card v2-sum"><div class="v2-sum-top"><span>${fG.format(d)}</span><span style="display:flex;gap:8px;align-items:center"><a class="v2-pill" href="#/ward/history"><i class="ri-calendar-2-line"></i>سجل الشهر</a><span id="sync"></span></span></div>
+<div class="v2-sum-body">${v2Ring(done, total, '#0F6B5C', '#E3E8EB', `<b class="num" style="font-size:26px">${n2a(done)}<span style="font-size:15px;color:#8A9AA0">/${n2a(total)}</span></b><small style="color:#52626A">مكتمل</small>`)}<div><p class="v2-sub">${esc(me.full_name)}</p><h1 class="v2-h1">ورد اليوم</h1><p class="v2-sub">بقي ${n2a(rem)} أوراد · ${fH.format(d)}</p></div></div>
+<div class="v2-mini"><div class="a"><b class="num">${n2a(done)}</b><span>مكتمل</span></div><div><b class="num">${n2a(partial)}</b><span>قيد الإنجاز</span></div><div><b class="num">${n2a(total - done - partial)}</b><span>لم يبدأ</span></div></div>
+<p class="v2-lock"><i class="ri-lock-line"></i><span>القالب معتمد من شيخك ولا يمكن تعديله. الورد غير المسجل لا يُحتسب تلقائيًا، وسجل اليوم يُغلق بعد منتصف الليل.</span></p></section>` + (sec || '<div class="v2-card" style="text-align:center"><p class="v2-sub">لا توجد أوراد بعد. سيضيفها الشيخ.</p></div>');
+    const wr = document.getElementById('wr'); if (ctx.wardFast && wr) { wr.innerHTML = HTML; } else { draw('<div id="wr" style="display:grid;gap:16px">' + HTML + '</div>'); window.scrollTo(0, y); }
+    ctx.wardFast = true; setSync(ctx.syncState || 'idle'); bindWard(paint);
+  };
+  paint();
+}
+function hubGrid() {
+  const t = (h, ic, n, s) => `<a href="#${h}"><span class="ic"><i class="${ic}"></i></span><b>${n}</b><span class="s">${s}</span></a>`;
+  return `<section><div class="v2-hub">${t('/sheikh/stages', 'ri-stairs-line', 'المراحل', 'أوراد كل مرحلة وأهدافها')}${me.role === 'supervisor' ? '' : t('/sheikh/wird', 'ri-list-check-2', 'الأوراد', 'إضافة وتعديل الأوراد')}${t('/sheikh/members', 'ri-team-line', 'الأعضاء', 'بيانات الأعضاء وملاحظاتهم')}${t('/sheikh/roster', 'ri-group-2-line', 'المجموعات', 'الحلقات والأسر')}${t('/sheikh/requests', 'ri-user-add-line', 'الطلبات', 'طلبات الانضمام')}${t('/sheikh/promotions', 'ri-medal-line', 'الترقيات', 'ترقية الأعضاء بين المراحل')}${t('/sheikh/reports', 'ri-table-line', 'الجداول', 'متابعة الأعضاء والتقارير')}</div></section>`;
+}
