@@ -76,9 +76,9 @@ async function viewReminders() {
   try { const reg = await navigator.serviceWorker.ready; sub = await reg.pushManager.getSubscription(); } catch (e) { }
   const st = pushState(), on = !!sub && st === 'granted';
   const msg = st === 'ios-install' ? 'على الآيفون: افتح الموقع في Safari، اضغط مشاركة ثم "إضافة إلى الشاشة الرئيسية"، وافتح التطبيق من الأيقونة، ثم فعّل الإشعارات.' : st === 'unsupported' ? 'هذا المتصفح لا يدعم الإشعارات.' : st === 'denied' ? 'الإشعارات محظورة لهذا الموقع. فعّلها من إعدادات المتصفح أو الهاتف.' : '';
-  const row = ([k, ic, t, s]) => `<li class="flex items-center gap-3 px-4 py-3"><span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary-50 text-primary-700"><i class="${ic} text-[14px]"></i></span><span class="min-w-0 flex-1"><span class="block text-[12.5px] font-medium text-foreground-800">${t}</span><span class="block text-[10.5px] text-foreground-500">${s}</span></span><button data-k="${k}" role="switch" aria-checked="${!!prefs[k]}" style="position:relative;width:44px;height:24px;border-radius:9999px;border:0;flex-shrink:0;transition:background .2s;background:${prefs[k] ? '#4a7766' : '#d9d3c4'}"><span style="position:absolute;top:2px;width:20px;height:20px;border-radius:9999px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:all .2s;${prefs[k] ? 'right:2px' : 'right:22px'}"></span></button></li>`;
+  const row = ([k, ic, t, s]) => `<li class="flex items-center gap-3 px-4 py-3"><span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary-50 text-primary-700"><i class="${ic} text-[14px]"></i></span><span class="min-w-0 flex-1"><span class="block text-[12.5px] font-medium text-foreground-800">${t}</span><span class="block text-[10.5px] text-foreground-500">${s}</span></span><button data-k="${k}" role="switch" aria-checked="${!!prefs[k]}" style="position:relative;width:44px;height:24px;border-radius:9999px;border:0;flex-shrink:0;transition:background .2s;background:${prefs[k] ? '#4a7766' : '#d5dde0'}"><span style="position:absolute;top:2px;width:20px;height:20px;border-radius:9999px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:all .2s;${prefs[k] ? 'right:2px' : 'right:22px'}"></span></button></li>`;
   $app.innerHTML = shell(`<div class="space-y-4 md:space-y-5"><div><h2 class="font-heading text-2xl font-semibold text-foreground-900">الإشعارات والتذكيرات</h2><p class="mt-1 text-[12px] text-foreground-600">تصلك على هاتفك كإشعارات حقيقية.</p></div>
-  <div class="rounded-xl border border-background-300 bg-white p-4"><div class="flex items-center justify-between gap-3"><div><p class="text-[13px] font-semibold text-foreground-800">إشعارات هذا الجهاز</p><p class="text-[11px] text-foreground-500">${on ? 'مفعّلة' : 'غير مفعّلة'}</p></div><button id="pushb" style="border-radius:10px;padding:8px 18px;font-size:12px;font-weight:600;${on ? 'background:#fff;border:1px solid #d9d3c4;color:#333' : 'background:#4a7766;border:0;color:#fff'}">${on ? 'إيقاف' : 'تفعيل'}</button></div>${msg ? `<p style="margin-top:12px;border-radius:10px;background:#fbf3dc;padding:12px;font-size:11px;line-height:1.8;color:#6b4e08">${msg}</p>` : ''}${on ? '<button id="pusht" class="mt-3 text-[11.5px] font-medium text-primary-700 underline">أرسل إشعار تجربة</button>' : ''}</div>
+  <div class="rounded-xl border border-background-300 bg-white p-4"><div class="flex items-center justify-between gap-3"><div><p class="text-[13px] font-semibold text-foreground-800">إشعارات هذا الجهاز</p><p class="text-[11px] text-foreground-500">${on ? 'مفعّلة' : 'غير مفعّلة'}</p></div><button id="pushb" style="border-radius:10px;padding:8px 18px;font-size:12px;font-weight:600;${on ? 'background:#fff;border:1px solid #d5dde0;color:#333' : 'background:#4a7766;border:0;color:#fff'}">${on ? 'إيقاف' : 'تفعيل'}</button></div>${msg ? `<p style="margin-top:12px;border-radius:10px;background:#eef4f3;padding:12px;font-size:11px;line-height:1.8;color:#0f4a39">${msg}</p>` : ''}${on ? '<button id="pusht" class="mt-3 text-[11.5px] font-medium text-primary-700 underline">أرسل إشعار تجربة</button>' : ''}</div>
   <ul class="divide-y divide-background-200 overflow-hidden rounded-xl border border-background-300 bg-white">${RKEYS.map(row).join('')}</ul>
   <p class="text-[10.5px] leading-6 text-foreground-500">المواقيت من خدمة Aladhan المجانية (القاهرة، الهيئة المصرية). الوصول بأفضل جهد وقد يتأخر قليلًا، خاصة مع توفير البطارية في أندرويد.</p></div>`);
   document.getElementById('pushb').onclick = async () => {
@@ -97,7 +97,7 @@ async function viewReminders() {
   document.querySelectorAll('[data-k]').forEach(b => b.onclick = async () => {
     prefs[b.dataset.k] = !prefs[b.dataset.k];
     try { await api('/rest/v1/reminder_prefs?on_conflict=user_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates' }, body: { user_id: S.uid, wird: prefs.wird, prayers: prefs.prayers, monthu: prefs.monthu, whitedays: prefs.whitedays } }); } catch (e) { toast('تعذّر الحفظ'); }
-    b.setAttribute('aria-checked', prefs[b.dataset.k]); b.style.background = prefs[b.dataset.k] ? '#4a7766' : '#d9d3c4'; const d = b.firstElementChild; d.style.right = prefs[b.dataset.k] ? '2px' : '22px';
+    b.setAttribute('aria-checked', prefs[b.dataset.k]); b.style.background = prefs[b.dataset.k] ? '#4a7766' : '#d5dde0'; const d = b.firstElementChild; d.style.right = prefs[b.dataset.k] ? '2px' : '22px';
   });
 }
 
@@ -290,7 +290,7 @@ function applyTheme() { const t = THEMES.find(x => x[0] === localStorage.getItem
 applyTheme();
 const FONTS = [['noto', 'Noto Sans Arabic', 'نوتو سانس · واضح ومريح'], ['almarai', 'Almarai', 'المرعي · حديث وبسيط'], ['tajawal', 'Tajawal', 'تجوّل · خفيف ومرتب'], ['plex', 'IBM Plex Sans Arabic', 'آي بي إم · رسمي وواضح']];
 function fontStack(k) { const f = FONTS.find(x => x[0] === k) || FONTS[0]; return `"${f[1]}", "Noto Sans Arabic", system-ui, sans-serif`; }
-function applyFont() { const k = localStorage.getItem('font') || 'noto'; const st = fontStack(k); const r = document.documentElement.style; r.setProperty('--font-body', st); r.setProperty('--font-heading', st); r.setProperty('--font-label', st); }
+function applyFont() { const k = localStorage.getItem('font2') || 'plex'; const st = fontStack(k); const r = document.documentElement.style; r.setProperty('--font-body', st); r.setProperty('--font-heading', st); r.setProperty('--font-label', st); }
 applyFont();
 const SIZES = [['s', 'صغير', .92, .96], ['m', 'متوسط', 1, 1], ['l', 'كبير', 1.15, 1.12]];
 function applySize() { const k = localStorage.getItem('fsize2') || 'm'; const z = SIZES.find(x => x[0] === k) || SIZES[0]; const f = window.innerWidth >= 1024 ? z[2] : z[3]; const r = document.documentElement; r.style.zoom = f === 1 ? '' : f; r.style.setProperty('--z', f); }
@@ -305,7 +305,7 @@ body{font-size:16px;line-height:1.65}
 [class*="text-[13"]{font-size:15.5px!important}
 [class*="text-[14"],[class*="text-[15"]{font-size:17px!important}
 
-body{background:#f6f3ec!important}
+body{background:#f4f6f7!important}
 .bg-primary-800{background-color:#3d6656!important}.bg-primary-700{background-color:#456f5e!important}.bg-primary-600,.bg-primary-500{background-color:#55806c!important}
 .border-primary-800{border-color:#3d6656!important}
 .pattern-emerald{background-image:none!important;background:linear-gradient(160deg,#3f6a59,#355b4c)!important}
@@ -319,21 +319,21 @@ body{background:#f6f3ec!important}
 .rp thead tr:nth-child(2) th{background:#e8f0ea!important}
 .rp th.g{background:#cbdcd1!important}
 .rp th:first-child{background:#cbdcd1!important;color:#2b4a3f!important}
-.rp td{padding:10px 6px!important;font-size:15.5px!important;border-bottom:1px solid #eceee6!important;border-left:1px solid #f3f3ec!important}
-.rp tr:nth-child(even) td{background:#fbfaf6}
+.rp td{padding:10px 6px!important;font-size:15.5px!important;border-bottom:1px solid #eceee6!important;border-left:1px solid #f4f6f7!important}
+.rp tr:nth-child(even) td{background:#f7f9fa}
 .rp td:first-child{background:#f1f5ef!important;color:#2b4a3f!important;border-left:2px solid #dbe6dc!important;font-size:14.5px!important}
 .rp td.fr{box-shadow:inset 0 0 0 99px rgba(196,170,98,.10)}
 .rv,.rv .panel{border-radius:16px}
 
-.rp td{background:#fff!important}.rp tr:nth-child(even) td{background:#fbfaf6!important}
+.rp td{background:#fff!important}.rp tr:nth-child(even) td{background:#f7f9fa!important}
 td.no{background:#fff!important;color:#d2b3af!important;font-size:15px!important;font-weight:400!important}
 td.ok{background:#e4f0e7!important;color:#3a7a56!important;font-weight:800!important;font-size:18px!important}
 td.na{background:#f1f1ec!important}
 .rp td:first-child{background:#f1f5ef!important}
 .hubw{background:#eef4f3!important;border:1.5px solid #cfdcd9!important;border-radius:18px!important;padding:16px!important}
-.hubw h2{color:#6b4a14!important}.hubw .mt{color:#6b5a30!important}
+.hubw h2{color:#0f4a39!important}.hubw .mt{color:#2b4a3f!important}
 .hubw a{border-color:#cfdcd9!important}
-.hubw a span:first-child{background:#f3e5b8!important;color:#8a5f12!important}
+.hubw a span:first-child{background:#dcebe8!important;color:#0f4a39!important}
 
 aside.sticky{background:#2f4f43!important;border-left:0!important;box-shadow:-6px 0 24px rgba(30,50,42,.18)}
 aside.sticky,aside.sticky *{color:#eef4f0!important}
@@ -350,7 +350,7 @@ main h2{font-size:20px!important;font-weight:700!important}
 main h3{font-size:17px!important;font-weight:700!important}
 .sp header h1{font-size:26px!important}.sp h3{font-size:17px!important}
 .mt,.sp .mt,.rv .mt{opacity:1!important;color:#33443a!important;font-size:13.5px!important}
-body{background:#f1ede1!important}
+body{background:#eef1f2!important}
 .bg-primary-800{background-color:#0f5a43!important}.bg-primary-700{background-color:#146b50!important}.bg-primary-600,.bg-primary-500{background-color:#1a7a5a!important}
 .border-primary-800{border-color:#0f5a43!important}
 .pattern-emerald{background:linear-gradient(160deg,#0f6a4e,#0a4a37)!important}
@@ -367,13 +367,13 @@ td.na{background:#e6e6de!important}
 .rp thead tr:nth-child(2) th{background:#d3e6da!important}
 .rp td:first-child{background:#dfece3!important;color:#0b3d2e!important}
 .hubw{background:#e3eeec!important;border:2px solid #cfdcd9!important}
-.hubw h2{color:#5a3a00!important}.hubw a span:first-child{background:#f3d77e!important;color:#6b4300!important}
+.hubw h2{color:#0f4a39!important}.hubw a span:first-child{background:#c9e6e1!important;color:#0f4a39!important}
 .mt,.sp .mt,.rv .mt{color:#1f2f27!important}
 aside.sticky{background:#0f4a39!important}
 aside.sticky,aside.sticky *{color:#ffffff!important}
 aside.sticky .text-foreground-400,aside.sticky p{color:#e3f1ea!important}
 aside.sticky nav a{font-size:17.5px!important;font-weight:700!important}
-aside.sticky nav a[class*="bg-primary-50"]{background:#f3c64a!important}
+aside.sticky nav a[class*="bg-primary-50"]{background:#8fd3c6!important}
 aside.sticky nav a[class*="bg-primary-50"],aside.sticky nav a[class*="bg-primary-50"] *{color:#1b2a22!important}
 aside.sticky nav a[class*="bg-primary-50"] span.flex{background:rgba(0,0,0,.12)!important}
 aside.sticky nav a span.flex{background:rgba(255,255,255,.18)!important}
@@ -755,7 +755,7 @@ async function qSync(a) {
 }
 function qStatusHtml(a) {
   const R = ctx.qr, unit = a.quran_unit === 'pages' ? 'pages' : 'juz', amt = qAmount(R.reads.filter(r => r.read_date === today()), unit), need = qNeed(a), ok = amt >= need - 1e-9, u = unit === 'pages' ? 'صفحة' : 'جزء';
-  return `<p style="margin:0;padding:10px 12px;border-radius:12px;font-size:16px;font-weight:700;line-height:1.7;background:${ok ? '#e4f0e7' : '#eef4f3'};color:${ok ? '#2f6a4a' : '#6b4a14'}">${ok ? '✓ اكتمل ورد القرآن اليوم' : 'لم يكتمل بعد'} · قرأت ${qFmt(amt)} من ${qFmt(need)} ${u}${ok ? '' : ' · بقي ' + qFmt(need - amt) + ' ' + u}</p>`;
+  return `<p style="margin:0;padding:10px 12px;border-radius:12px;font-size:16px;font-weight:700;line-height:1.7;background:${ok ? '#e4f0e7' : '#eef4f3'};color:${ok ? '#2f6a4a' : '#0f4a39'}">${ok ? '✓ اكتمل ورد القرآن اليوم' : 'لم يكتمل بعد'} · قرأت ${qFmt(amt)} من ${qFmt(need)} ${u}${ok ? '' : ' · بقي ' + qFmt(need - amt) + ' ' + u}</p>`;
 }
 async function qpLoad() { const reads = await q('quran_reads', `select=*&member_id=eq.${me.id}&order=created_at.desc&limit=200`); ctx.qr = { reads, sel: null }; }
 function qpPaint() {
@@ -764,7 +764,7 @@ function qpPaint() {
   const tot = list.reduce((a, r) => a + (r.to_ayah - r.from_ayah + 1), 0);
   const cur = R.sel || (last ? (last.to_ayah < SURAH[last.surah - 1][1] ? { s: last.surah, f: last.to_ayah + 1 } : { s: Math.min(114, last.surah + 1), f: 1 }) : { s: 1, f: 1 }), max = SURAH[cur.s - 1][1];
   const inp = 'width:100%;height:48px;border:1.5px solid #b3cdbf;border-radius:12px;font:inherit;font-size:19px;font-weight:700;text-align:center;background:#fff;color:#2b4a3f';
-  box.innerHTML = `<div style="border-top:1px dashed #d3e2d9;padding-top:12px;display:grid;gap:10px">${qStatusHtml(qa)}${last ? `<p style="margin:0;font-size:15px;font-weight:700;color:#6b4a00;background:#fdf3d8;border-radius:10px;padding:8px 12px">آخر موضع وقفت عنده: سورة ${esc(sName(last.surah))} · الآية ${n2a(last.to_ayah)}</p>` : ''}
+  box.innerHTML = `<div style="border-top:1px dashed #d3e2d9;padding-top:12px;display:grid;gap:10px">${qStatusHtml(qa)}${last ? `<p style="margin:0;font-size:15px;font-weight:700;color:#0f4a39;background:#eef4f3;border-radius:10px;padding:8px 12px">آخر موضع وقفت عنده: سورة ${esc(sName(last.surah))} · الآية ${n2a(last.to_ayah)}</p>` : ''}
 <label style="font-size:16px;font-weight:700;color:#2b4a3f">السورة</label><select id="qs" style="${inp};text-align-last:center">${SURAH.map((x, i) => `<option value="${i + 1}" ${i + 1 === cur.s ? 'selected' : ''}>${n2a(i + 1)}. ${x[0]} (${n2a(x[1])} آية)</option>`).join('')}</select>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div><label style="font-size:16px;font-weight:700;color:#2b4a3f">من الآية</label><input id="qf" type="number" inputmode="numeric" min="1" max="${max}" value="${cur.f}" style="${inp}"></div><div><label style="font-size:16px;font-weight:700;color:#2b4a3f">إلى الآية</label><input id="qt" type="number" inputmode="numeric" min="1" max="${max}" value="${max}" style="${inp}"></div></div>
 <p id="qpg" style="margin:0;font-size:16px;font-weight:700;color:#3b6556;text-align:center"></p><button type="button" id="qall" style="border:1px solid #b3cdbf;background:#fff;color:#4a7766;border-radius:12px;padding:9px;font:inherit;font-size:15px;font-weight:700;cursor:pointer">إلى آخر السورة (${n2a(max)})</button>
@@ -791,16 +791,16 @@ async function viewSettings() {
   const row = (href, ic, t, sub) => `<a href="${href}" style="display:flex;align-items:center;gap:12px;padding:14px;border:1px solid #e1e8df;border-radius:14px;background:#fff;text-decoration:none;color:#2b4a3f"><span style="width:42px;height:42px;border-radius:12px;background:#edf3ee;color:#4a7766;display:flex;align-items:center;justify-content:center;font-size:21px;flex:none"><i class="${ic}"></i></span><span style="flex:1"><span style="display:block;font-size:17px;font-weight:700">${t}</span><span style="display:block;font-size:14px;color:#33443a">${sub}</span></span><i class="ri-arrow-left-s-line" style="font-size:20px;color:#4a7766"></i></a>`;
   const seg = (v, t) => `<button type="button" data-pv="${v}" style="flex:1;border:1.5px solid ${prev === v ? '#4a7766' : '#d3e2d9'};background:${prev === v ? '#4a7766' : '#fff'};color:${prev === v ? '#fff' : '#3b6556'};border-radius:12px;padding:11px 6px;font:inherit;font-size:15px;font-weight:700;cursor:pointer">${t}</button>`;
   draw(wrapS(`<div style="display:grid;gap:14px"><div><h1 style="margin:0;color:#2b4a3f">الإعدادات</h1><p style="margin:4px 0 0;font-size:16px;color:#33443a">${esc(me.full_name)} · ${esc(me.email || '')} · ${ROLE_AR[me.real_role || me.role] || ''}</p></div>
-${me.real_role ? `<section class="rounded-lg border border-accent-300 bg-accent-50 p-4"><h2 style="margin:0;color:#1f3d38">معاينة التطبيق (للمالك فقط)</h2><p style="margin:4px 0 10px;font-size:15px;color:#4a3600">اعرض التطبيق كما يراه الشيخ أو المشرف أو العضو. صلاحياتك الفعلية لا تتغيّر.</p><div style="display:flex;gap:8px;flex-wrap:wrap">${seg('', 'حسابي')}${seg('sheikh', 'شيخ')}${seg('supervisor', 'مشرف')}${seg('member', 'عضو')}</div></section>` : ''}
+${me.real_role ? `<section class="rounded-lg border border-accent-300 bg-accent-50 p-4"><h2 style="margin:0;color:#1f3d38">معاينة التطبيق (للمالك فقط)</h2><p style="margin:4px 0 10px;font-size:15px;color:#0f4a39">اعرض التطبيق كما يراه الشيخ أو المشرف أو العضو. صلاحياتك الفعلية لا تتغيّر.</p><div style="display:flex;gap:8px;flex-wrap:wrap">${seg('', 'حسابي')}${seg('sheikh', 'شيخ')}${seg('supervisor', 'مشرف')}${seg('member', 'عضو')}</div></section>` : ''}
 <section class="rounded-lg border border-background-300 bg-background-50 p-4"><h2 style="margin:0;color:#2b4a3f">ألوان التطبيق</h2><p style="margin:4px 0 10px;font-size:15px;color:#33443a">اختر اللون الذي يريح عينك. الأخضر الهادئ هو الافتراضي.</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${THEMES.map(t => `<button type="button" data-th="${t[0]}" style="border:2px solid ${(localStorage.getItem('theme') || 'green') === t[0] ? '#4a7766' : '#d3e2d9'};background:#fff;border-radius:14px;padding:12px;font:inherit;font-size:16px;font-weight:700;color:#2b4a3f;cursor:pointer;display:flex;align-items:center;gap:8px;justify-content:center"><span style="width:18px;height:18px;border-radius:50%;background:#4a7766;filter:hue-rotate(${t[2]}deg)"></span>${t[1]}</button>`).join('')}</div></section>
 <section class="rounded-lg border border-background-300 bg-background-50 p-4"><h2 style="margin:0;color:#2b4a3f">حجم الخط</h2><p style="margin:4px 0 10px;font-size:15px;color:#33443a">اختر الحجم المريح، ويتغيّر فورًا. الافتراضي صغير.</p><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">${SIZES.map(z => `<button type="button" data-fs="${z[0]}" style="border:2px solid ${(localStorage.getItem('fsize2') || 'm') === z[0] ? '#4a7766' : '#d3e2d9'};background:#fff;border-radius:14px;padding:12px;font:inherit;font-size:16px;font-weight:700;color:#2b4a3f;cursor:pointer">${z[1]}</button>`).join('')}</div></section>
-<section class="rounded-lg border border-background-300 bg-background-50 p-4"><h2 style="margin:0;color:#2b4a3f">الخط</h2><p style="margin:4px 0 10px;font-size:15px;color:#33443a">اختر الخط الأوضح لعينك، ويتغيّر فورًا. الافتراضي نوتو سانس.</p><div style="display:grid;gap:8px">${FONTS.map(f => `<button type="button" data-fn="${f[0]}" style="border:2px solid ${(localStorage.getItem('font') || 'noto') === f[0] ? '#4a7766' : '#d3e2d9'};background:#fff;border-radius:14px;padding:12px 14px;font-family:${fontStack(f[0])};font-size:17px;font-weight:700;color:#2b4a3f;cursor:pointer;text-align:right;line-height:1.5">${f[2]}<br><span style="font-weight:400;font-size:15px">سبحان الله وبحمده · ١٢٣٤٥ · وردي اليوم</span></button>`).join('')}</div></section>
+<section class="rounded-lg border border-background-300 bg-background-50 p-4"><h2 style="margin:0;color:#2b4a3f">الخط</h2><p style="margin:4px 0 10px;font-size:15px;color:#33443a">اختر الخط الأوضح لعينك، ويتغيّر فورًا. الافتراضي نوتو سانس.</p><div style="display:grid;gap:8px">${FONTS.map(f => `<button type="button" data-fn="${f[0]}" style="border:2px solid ${(localStorage.getItem('font2') || 'plex') === f[0] ? '#4a7766' : '#d3e2d9'};background:#fff;border-radius:14px;padding:12px 14px;font-family:${fontStack(f[0])};font-size:17px;font-weight:700;color:#2b4a3f;cursor:pointer;text-align:right;line-height:1.5">${f[2]}<br><span style="font-weight:400;font-size:15px">سبحان الله وبحمده · ١٢٣٤٥ · وردي اليوم</span></button>`).join('')}</div></section>
 <div style="display:grid;gap:10px">${row('#/more', 'ri-user-3-line', 'حسابي', 'بيانات الحساب والمرحلة والحلقة')}${row('#/reminders', 'ri-notification-3-line', 'الإشعارات والتذكيرات', 'مواقيت الأذكار والأيام البيض وغيرها')}${row('#/install', 'ri-smartphone-line', 'تثبيت التطبيق', 'إضافته إلى الشاشة الرئيسية')}${row('#/ward/history', 'ri-calendar-2-line', 'سجل الشهر', 'ما سجّلته في الأيام السابقة')}</div>
 <button type="button" id="lo2" style="border:1.5px solid #d3e2d9;background:#fff;color:#3b6556;border-radius:14px;padding:14px;font:inherit;font-size:17px;font-weight:700;cursor:pointer">تسجيل الخروج</button></div>`));
   document.getElementById('lo2').onclick = logout;
   document.querySelectorAll('[data-th]').forEach(b => b.onclick = () => { localStorage.setItem('theme', b.dataset.th); applyTheme(); viewSettings(); });
   document.querySelectorAll('[data-fs]').forEach(b => b.onclick = () => { localStorage.setItem('fsize2', b.dataset.fs); applySize(); viewSettings(); });
-  document.querySelectorAll('[data-fn]').forEach(b => b.onclick = () => { localStorage.setItem('font', b.dataset.fn); applyFont(); viewSettings(); });
+  document.querySelectorAll('[data-fn]').forEach(b => b.onclick = () => { localStorage.setItem('font2', b.dataset.fn); applyFont(); viewSettings(); });
 }
 
 /* ---------- stage editor ---------- */
@@ -1134,7 +1134,7 @@ async function viewReports(st) {
     const m = st.member, all = acts0.filter(a => enabled(m, a)), shown = dates.filter(d => ymd(d) <= todayS);
     const sel = st.day && shown.some(d => ymd(d) === st.day) ? st.day : ymd(shown[shown.length - 1] || dates[0]);
     const dueL = d => all.filter(a => due(m, a, d)), stat1 = d => { const l = dueL(d); const n = l.filter(a => done(m, a, ymd(d))).length; return { n, t: l.length }; };
-    const chips = dates.map(d => { const k = ymd(d), fut = k > todayS, x = fut ? { n: 0, t: 0 } : stat1(d), c = fut ? '#eceee6' : !x.t ? '#eceee6' : x.n >= x.t ? '#bfe0cb' : x.n ? '#f3e3b0' : '#f6e1de', on = k === sel; return `<button type="button" data-dy="${k}" ${fut ? 'disabled' : ''} style="flex:none;min-width:54px;padding:8px 6px;border-radius:14px;border:2.5px solid ${on ? '#3b6556' : 'transparent'};background:${c};font:inherit;color:#2b4a3f;cursor:pointer;opacity:${fut ? .5 : 1}"><div style="font-size:19px;font-weight:800">${n2a(hjDay(d))}</div><div style="font-size:12px;font-weight:600">${DAYN[d.getDay()]}</div></button>`; }).join('');
+    const chips = dates.map(d => { const k = ymd(d), fut = k > todayS, x = fut ? { n: 0, t: 0 } : stat1(d), c = fut ? '#eceee6' : !x.t ? '#eceee6' : x.n >= x.t ? '#bfe0cb' : x.n ? '#dcebe8' : '#f6e1de', on = k === sel; return `<button type="button" data-dy="${k}" ${fut ? 'disabled' : ''} style="flex:none;min-width:54px;padding:8px 6px;border-radius:14px;border:2.5px solid ${on ? '#3b6556' : 'transparent'};background:${c};font:inherit;color:#2b4a3f;cursor:pointer;opacity:${fut ? .5 : 1}"><div style="font-size:19px;font-weight:800">${n2a(hjDay(d))}</div><div style="font-size:12px;font-weight:600">${DAYN[d.getDay()]}</div></button>`; }).join('');
     const d0 = dates.find(d => ymd(d) === sel), list = dueL(d0), row = a => { const ok = done(m, a, sel), l = val(m, a, sel), n = a.type === 'counter' && l && +l.counter_value ? ` <span style="font-weight:600;color:#33443a">(${n2a(+l.counter_value)})</span>` : ''; return `<li style="display:flex;align-items:center;gap:12px;padding:12px;border:1px solid ${ok ? '#b3cdbf' : '#e6e9e0'};background:${ok ? '#eef6f0' : '#fff'};border-radius:14px;font-size:17px;font-weight:600;color:#2b4a3f"><span style="width:30px;height:30px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;border:2.5px solid ${ok ? '#4a7766' : '#cfd6cb'};background:${ok ? '#4a7766' : '#fff'};color:#fff;font-size:18px">${ok ? '✓' : ''}</span><span style="flex:1">${esc(a.title)}${n}</span><span style="font-size:13px;color:#5b6b60">${esc(a.grp || '')}</span></li>`; };
     const sx = stat1(d0);
     return `<div style="margin:14px 0 6px;font-weight:800;font-size:17px;color:#2b4a3f">اختر اليوم</div><div class="no-scrollbar" style="display:flex;gap:8px;overflow-x:auto;padding:4px 2px 10px">${chips}</div><section class="panel" style="margin-top:6px"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px"><b style="font-size:19px;color:#2b4a3f">${DAYN[d0.getDay()]} ${n2a(hjDay(d0))} ${hjTitle(d0).replace(/\s?[\d٠-٩]+$/, '')}</b><span style="font-size:16px;font-weight:700;color:#3b6556">${n2a(sx.n)} من ${n2a(sx.t)}</span></div>${list.length ? `<ul style="list-style:none;margin:0;padding:0;display:grid;gap:8px">${list.map(row).join('')}</ul>` : '<p style="margin:0;font-size:16px;color:#33443a">لا أوراد مستحقة في هذا اليوم.</p>'}</section>`;
