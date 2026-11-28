@@ -1206,6 +1206,7 @@ function exportPng() {
 }
 
 
+
 /* ===== V2 design system (overrides earlier definitions) ===== */
 (function () {
   const css = `
@@ -1436,4 +1437,49 @@ function viewWelcome() {
 <div class="feat i2"><i class="ri-notification-3-line"></i><div><b>تذكيرات على الفون</b><div class="muted small">الورد وأذكار الصلاة وصيام الاثنين والخميس والأيام البيض</div></div></div>
 <div class="feat i3"><i class="ri-team-line"></i><div><b>مجموعتك وشيخك</b><div class="muted small">متابعة مرحلتك وتقدّمك وسط إخوانك</div></div></div>
 <a class="btn" href="#/login">تسجيل الدخول</a><a class="btn sec" href="#/register">إنشاء حساب جديد</a>`, 'السلام عليكم ورحمة الله وبركاته');
+}
+
+/* ===== V2 reports + settings ===== */
+(function () {
+  const st = document.createElement('style'); st.id = 'v2rcss';
+  st.textContent = '.rp2 h2{margin:0 0 10px;font-size:20px;font-weight:800}.rp2 section{background:#fff;border:1.5px solid #E2E8F0;border-radius:18px;padding:16px;margin-bottom:14px}.rp2 .tot{font-size:40px;font-weight:800;color:#0D9488;line-height:1.1}.rp2 .row{display:flex;align-items:center;gap:10px;padding:11px 0;border-top:1px solid #EEF2F7;font-size:17px}.rp2 .row:first-of-type{border-top:0}.rp2 .nm{flex:1;font-weight:700}.rp2 .no{width:30px;height:30px;border-radius:50%;background:#CCFBF1;color:#0F766E;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:15px;flex:none}.rp2 .n{font-weight:800;font-size:18px;color:#0F172A}.rp2 .pill{border:2px solid #0D9488;background:#fff;color:#0F766E;border-radius:999px;padding:9px 18px;font:inherit;font-size:16px;font-weight:700;cursor:pointer}.rp2 .pill.on{background:#0D9488;color:#fff}.rp2 .sub{font-size:15px;color:#475569;margin:0 0 6px}';
+  document.head.appendChild(st);
+})();
+window.__rp2 = window.__rp2 || { days: 30 };
+async function viewReports() {
+  const days = window.__rp2.days, tdy = new Date(), from = new Date(tdy); from.setDate(from.getDate() - (days - 1));
+  const f = ymd(from), t = ymd(tdy);
+  let [members, acts, logs, parts] = await Promise.all([q('profiles', 'select=id,full_name,role&status=eq.active&order=full_name'), q('wird_activities', 'select=id,title,type&is_active=eq.true'), q('wird_logs', `select=member_id,activity_id,log_date,completed,counter_value&log_date=gte.${f}&log_date=lte.${t}&limit=20000`), q('wird_part_logs', `select=member_id,activity_id,log_date&completed=eq.true&log_date=gte.${f}&log_date=lte.${t}&limit=20000`)]);
+  { const only = members.filter(m => m.role === 'member'); if (only.length) members = only; }
+  const fajr = acts.find(a => a.title === 'الفجر'); const qset = new Set(acts.filter(a => a.type === 'quran').map(a => a.id));
+  const rows = members.map(m => {
+    const L = logs.filter(x => x.member_id === m.id && (x.completed || (+x.counter_value || 0) > 0));
+    const P = parts.filter(x => x.member_id === m.id);
+    const total = L.filter(x => !qset.has(x.activity_id)).length + P.length;
+    const fj = fajr ? L.filter(x => x.activity_id === fajr.id).length : 0;
+    const dset = new Set(L.map(x => x.log_date)); P.forEach(x => dset.add(x.log_date));
+    return { n: m.full_name, total, fj, dd: dset.size };
+  });
+  const list = (key, unit) => [...rows].sort((a, b) => b[key] - a[key]).map((r, i) => `<div class="row"><span class="no">${n2a(i + 1)}</span><span class="nm">${esc(r.n)}</span><span class="n">${n2a(r[key])}</span><span style="font-size:14px;color:#64748B">${unit}</span></div>`).join('') || '<p class="sub">لا توجد بيانات بعد.</p>';
+  const sum = rows.reduce((a, r) => a + r.total, 0);
+  const pill = (d, l) => `<button type="button" class="pill ${days === d ? 'on' : ''}" data-d="${d}">${l}</button>`;
+  $app.innerHTML = sheikhPage('/sheikh/reports', 'التقارير', `<div class="rp2"><div style="display:flex;gap:8px;margin-bottom:14px">${pill(7, 'آخر ٧ أيام')}${pill(30, 'آخر ٣٠ يومًا')}</div>
+<section><h2>١. مجموع العبادات</h2><p class="sub">كل ما سجّله الأعضاء في هذه الفترة</p><div class="tot">${n2a(sum)}</div>${list('total', 'عبادة')}</section>
+<section><h2>٢. صلاة الفجر</h2><p class="sub">عدد الأيام التي صُلّي فيها الفجر</p>${list('fj', 'يوم')}</section>
+<section><h2>٣. الأكثر حضورًا وتسجيلًا</h2><p class="sub">عدد الأيام التي سجّل فيها العضو</p>${list('dd', 'يوم')}</section></div>`);
+  $app.querySelectorAll('[data-d]').forEach(b => b.onclick = () => { window.__rp2.days = +b.dataset.d; viewReports(); });
+}
+{
+  const _vs = viewSettings;
+  viewSettings = async function () {
+    await _vs();
+    try {
+      if (!isStaff()) return;
+      const box = document.getElementById('lo2'); if (!box || document.getElementById('v2ed')) return;
+      const l = [['/sheikh/stages', 'المراحل وأوراد كل مرحلة'], ['/sheikh/wird', 'الأوراد'], ['/sheikh/members', 'الأعضاء'], ['/sheikh/roster', 'المجموعات'], ['/sheikh/requests', 'الطلبات'], ['/sheikh/promotions', 'الترقيات']].filter(x => !(x[0] === '/sheikh/wird' && me.role === 'supervisor'));
+      const d = document.createElement('section'); d.id = 'v2ed'; d.style.cssText = 'background:#fff;border:1.5px solid #99F6E4;border-radius:18px;padding:16px;margin-bottom:14px';
+      d.innerHTML = '<h2 style="margin:0 0 10px;font-size:20px;font-weight:800">التعديلات</h2><div style="display:grid;gap:8px">' + l.map(x => `<a href="#${x[0]}" style="display:block;padding:14px;border-radius:14px;background:#F0FDFA;color:#0F766E;font-weight:800;font-size:17px;text-decoration:none">${x[1]}</a>`).join('') + '</div>';
+      box.parentNode.insertBefore(d, box.previousElementSibling || box);
+    } catch (e) { }
+  };
 }
